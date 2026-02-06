@@ -1,18 +1,24 @@
 apply plugin: 'com.android.application'
 
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace = "com.ontime.app"
+    namespace = "com.ontimeapp.prayer"
     compileSdk = rootProject.ext.compileSdkVersion
     signingConfigs {
         release {
-            storeFile file('../ontime-release.keystore')
-            storePassword 'ontime123'
-            keyAlias 'ontime'
-            keyPassword 'ontime123'
+            storeFile file(keystoreProperties['storeFile'] ?: '../ontime-release.keystore')
+            storePassword keystoreProperties['storePassword'] ?: ''
+            keyAlias keystoreProperties['keyAlias'] ?: ''
+            keyPassword keystoreProperties['keyPassword'] ?: ''
         }
     }
     defaultConfig {
-        applicationId "com.ontime.app"
+        applicationId "com.ontimeapp.prayer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

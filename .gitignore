@@ -25,6 +25,7 @@ dist-ssr
 
 # Android
 *.keystore
+keystore.properties
 *.apk
 android/app/build/
 android/.gradle/

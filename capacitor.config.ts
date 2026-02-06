@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ontime.app',
+  appId: 'com.ontimeapp.prayer',
   appName: 'OnTime',
   webDir: 'dist',
   server: {
