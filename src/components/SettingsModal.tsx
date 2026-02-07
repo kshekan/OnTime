@@ -1,13 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLocation } from '../context/LocationContext';
 import { useTravel } from '../context/TravelContext';
 import { CALCULATION_METHODS } from '../services/prayerService';
 import { CitySearch } from './CitySearch';
-import type { CalculationMethod, PrayerName, NotificationSound, CityEntry } from '../types';
+import {
+  fetchAthanCatalog,
+  downloadAthan,
+  deleteAthanFile,
+  selectAthan,
+  playAthanPreview,
+  stopAthanPreview,
+} from '../services/athanService';
+import { AthanPlugin } from '../plugins/athanPlugin';
+import type { CalculationMethod, PrayerName, NotificationSound, CityEntry, AthanCatalogEntry, AthanFile } from '../types';
 
-type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'jumuah' | 'notifications' | 'travel' | 'about' | 'travel-home-search';
+type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'jumuah' | 'notifications' | 'travel' | 'about' | 'travel-home-search' | 'athan' | 'athan-catalog';
 
 const PRAYER_LABELS: Record<PrayerName, string> = {
   fajr: 'Fajr',
@@ -41,15 +50,18 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [category, setCategory] = useState<SettingsCategory>('main');
   
-  const { 
-    settings, 
-    updateCalculationMethod, 
+  const {
+    settings,
+    updateCalculationMethod,
     updateAsrCalculation,
     updateOptionalPrayers,
     updateNotifications,
     updatePrayerNotification,
     updateJumuah,
     updateDisplay,
+    updateAthan,
+    addPreviousLocation,
+    removePreviousLocation,
   } = useSettings();
   const { theme, setTheme } = useTheme();
   const { location, setManualLocation, getGPSLocation, error: locationError } = useLocation();
@@ -62,6 +74,40 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [manualLat, setManualLat] = useState('');
   const [manualLng, setManualLng] = useState('');
   const [manualCity, setManualCity] = useState('');
+
+  // Athan state
+  const [catalog, setCatalog] = useState<AthanCatalogEntry[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [useSeparateFajr, setUseSeparateFajr] = useState(
+    settings.athan.selectedFajrAthanId !== null && settings.athan.selectedFajrAthanId !== settings.athan.selectedAthanId
+  );
+
+  // Stop preview on category change or modal close
+  const stopPreview = useCallback(() => {
+    if (previewingId) {
+      stopAthanPreview().catch(() => {});
+      setPreviewingId(null);
+    }
+  }, [previewingId]);
+
+  useEffect(() => {
+    return () => { stopPreview(); };
+  }, [category, stopPreview]);
+
+  useEffect(() => {
+    if (!isOpen) stopPreview();
+  }, [isOpen, stopPreview]);
+
+  // Listen for preview complete
+  useEffect(() => {
+    let handle: ReturnType<typeof AthanPlugin.addListener> | null = null;
+    handle = AthanPlugin.addListener('previewComplete', () => {
+      setPreviewingId(null);
+    });
+    return () => { handle?.then(h => h.remove()); };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -83,6 +129,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const handleBack = () => {
     if (category === 'travel-home-search') {
       setCategory('travel');
+      return;
+    }
+    if (category === 'athan-catalog') {
+      setCategory('athan');
       return;
     }
     setCategory('main');
@@ -112,6 +162,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const enabledCount = Object.values(settings.notifications.prayers).filter(p => p.enabled).length;
     return `${enabledCount} prayers`;
   };
+  const getAthanSummary = () => {
+    const selected = settings.athan.downloadedAthans.find(a => a.id === settings.athan.selectedAthanId);
+    if (selected) return selected.muezzinName;
+    return 'Default';
+  };
   const getTravelSummary = () => {
     if (!settings.travel.enabled) return 'Off';
     if (travelState.isTraveling) return 'Traveling';
@@ -119,12 +174,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--color-background)] safe-area-top safe-area-bottom animate-slide-in">
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-lg mx-auto px-6 py-6 pb-10">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 z-50 bg-[var(--color-background)] safe-area-top safe-area-bottom animate-slide-in flex flex-col">
+      {/* Sticky Header */}
+      <div className="flex-shrink-0 bg-[var(--color-background)] border-b border-[var(--color-border)]">
+        <div className="max-w-lg mx-auto px-6 py-4 flex items-center justify-between">
           {category !== 'main' ? (
             <button
               onClick={handleBack}
@@ -147,6 +200,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-lg mx-auto px-6 py-6 pb-10">
 
         {/* Main Categories List */}
         {category === 'main' && (
@@ -182,6 +240,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               onClick={() => setCategory('notifications')}
             />
             <CategoryItem
+              icon={<AthanIcon />}
+              title="Athan Sounds"
+              summary={getAthanSummary()}
+              onClick={() => setCategory('athan')}
+            />
+            <CategoryItem
               icon={<TravelIcon />}
               title="Travel Mode"
               summary={getTravelSummary()}
@@ -203,10 +267,55 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
             {/* Current Location Display */}
             <div className="p-4 rounded-xl bg-[var(--color-card)]">
-              <p className="text-[var(--color-text)] font-medium">{location.cityName}</p>
-              <p className="text-sm text-[var(--color-muted)]">
-                {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
-              </p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[var(--color-text)] font-medium">{location.cityName}</p>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
+                  </p>
+                </div>
+                {settings.travel.homeBase?.cityName === location.cityName && (
+                  <span className="text-xs bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-1 rounded-full font-medium">Home</span>
+                )}
+              </div>
+
+              {/* Set as Home button */}
+              {settings.travel.homeBase?.cityName !== location.cityName && (
+                <button
+                  onClick={() => {
+                    setHomeBase({
+                      coordinates: location.coordinates,
+                      cityName: location.cityName,
+                      countryCode: location.countryCode,
+                    });
+                    addPreviousLocation({
+                      coordinates: location.coordinates,
+                      cityName: location.cityName,
+                      countryCode: location.countryCode,
+                      savedAt: new Date().toISOString(),
+                    });
+                    if (!settings.travel.enabled) {
+                      toggleTravelEnabled();
+                    }
+                  }}
+                  className="mt-3 w-full py-2.5 border border-[var(--color-primary)] text-[var(--color-primary)] rounded-xl font-medium text-sm flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                  </svg>
+                  Set as Home
+                </button>
+              )}
+
+              {/* Tooltip */}
+              <div className="mt-3 flex items-start gap-2 bg-[var(--color-background)] rounded-lg p-2.5">
+                <svg className="w-4 h-4 text-[var(--color-muted)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Setting a home location enables travel mode. When you're more than {Math.round(settings.travel.distanceThresholdKm * 0.621)} miles from home, prayers are automatically shortened (Qasr) per Islamic travel rulings.
+                </p>
+              </div>
             </div>
 
             {/* Method Picker */}
@@ -245,6 +354,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     try {
                       const loc = await getGPSLocation();
                       setManualLocation(loc.coordinates, loc.cityName, loc.countryCode);
+                      addPreviousLocation({
+                        coordinates: loc.coordinates,
+                        cityName: loc.cityName,
+                        countryCode: loc.countryCode,
+                        savedAt: new Date().toISOString(),
+                      });
                       setLocationMethod(null);
                     } catch (err) {
                       setGpsError(err instanceof Error ? err.message : 'Failed to get location');
@@ -274,6 +389,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   city.n,
                   city.c,
                 );
+                addPreviousLocation({
+                  coordinates: { latitude: city.lat, longitude: city.lng },
+                  cityName: city.n,
+                  countryCode: city.c,
+                  savedAt: new Date().toISOString(),
+                });
                 setLocationMethod(null);
               }} />
             )}
@@ -320,6 +441,90 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 >
                   Save Location
                 </button>
+              </div>
+            )}
+
+            {/* Previous Locations */}
+            {settings.previousLocations.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-[var(--color-muted)] mb-2">Previous Locations</h4>
+                <div className="rounded-xl bg-[var(--color-card)] overflow-hidden divide-y divide-[var(--color-border)]">
+                  {settings.previousLocations.map((loc, index) => {
+                    const isHome = settings.travel.homeBase?.cityName === loc.cityName &&
+                      Math.abs((settings.travel.homeBase?.coordinates.latitude ?? 0) - loc.coordinates.latitude) < 0.01;
+                    const isCurrent = location.cityName === loc.cityName &&
+                      Math.abs(location.coordinates.latitude - loc.coordinates.latitude) < 0.01;
+                    return (
+                      <div key={`${loc.cityName}-${index}`} className="px-4 py-3 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-medium truncate ${isCurrent ? 'text-[var(--color-primary)]' : 'text-[var(--color-text)]'}`}>
+                              {loc.cityName}
+                            </p>
+                            {isHome && (
+                              <span className="text-[10px] bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Home</span>
+                            )}
+                            {isCurrent && (
+                              <span className="text-[10px] bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Current</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--color-muted)]">
+                            {loc.coordinates.latitude.toFixed(2)}, {loc.coordinates.longitude.toFixed(2)}
+                            {loc.countryCode ? ` · ${loc.countryCode}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          {/* Use as current location */}
+                          {!isCurrent && (
+                            <button
+                              onClick={() => {
+                                setManualLocation(loc.coordinates, loc.cityName, loc.countryCode);
+                              }}
+                              className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
+                              title="Use this location"
+                            >
+                              <svg className="w-4 h-4 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                              </svg>
+                            </button>
+                          )}
+                          {/* Set as home */}
+                          {!isHome && (
+                            <button
+                              onClick={() => {
+                                setHomeBase({
+                                  coordinates: loc.coordinates,
+                                  cityName: loc.cityName,
+                                  countryCode: loc.countryCode,
+                                });
+                                if (!settings.travel.enabled) {
+                                  toggleTravelEnabled();
+                                }
+                              }}
+                              className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
+                              title="Set as home"
+                            >
+                              <svg className="w-4 h-4 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                              </svg>
+                            </button>
+                          )}
+                          {/* Delete */}
+                          <button
+                            onClick={() => removePreviousLocation(index)}
+                            className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                            title="Remove"
+                          >
+                            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -655,6 +860,228 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
             )}
           </div>
+        )}
+
+        {/* Athan Settings */}
+        {category === 'athan' && (
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-[var(--color-text)]">Athan Sounds</h3>
+
+            {/* Browse & Download */}
+            <button
+              onClick={() => setCategory('athan-catalog')}
+              className="w-full p-4 rounded-xl bg-[var(--color-primary)] text-white font-medium hover:opacity-90 transition-opacity text-center"
+            >
+              Browse & Download Athans
+            </button>
+
+            {/* Downloaded athans list */}
+            {settings.athan.downloadedAthans.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-[var(--color-muted)]">
+                  {useSeparateFajr ? 'Main Athan' : 'Selected Athan'}
+                </p>
+
+                {/* Default sound option */}
+                <div
+                  onClick={() => {
+                    if (settings.athan.currentChannelId) {
+                      AthanPlugin.deleteChannel({ channelId: settings.athan.currentChannelId }).catch(() => {});
+                    }
+                    updateAthan({ selectedAthanId: null, currentChannelId: null });
+                  }}
+                  className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors ${
+                    !settings.athan.selectedAthanId
+                      ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]'
+                      : 'bg-[var(--color-card)] hover:bg-[var(--color-border)]'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    !settings.athan.selectedAthanId ? 'border-[var(--color-primary)]' : 'border-[var(--color-muted)]'
+                  }`}>
+                    {!settings.athan.selectedAthanId && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]" />
+                    )}
+                  </div>
+                  <span className="text-[var(--color-text)] font-medium">Use default sound</span>
+                </div>
+
+                {/* Downloaded athans */}
+                {settings.athan.downloadedAthans.map((athan) => (
+                  <div
+                    key={athan.id}
+                    className={`flex items-center gap-3 p-4 rounded-xl transition-colors ${
+                      settings.athan.selectedAthanId === athan.id
+                        ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]'
+                        : 'bg-[var(--color-card)]'
+                    }`}
+                  >
+                    {/* Radio button */}
+                    <div
+                      onClick={async () => {
+                        const channelId = await selectAthan(athan, settings.athan.currentChannelId, 'main');
+                        updateAthan({ selectedAthanId: athan.id, currentChannelId: channelId });
+                      }}
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 cursor-pointer ${
+                        settings.athan.selectedAthanId === athan.id ? 'border-[var(--color-primary)]' : 'border-[var(--color-muted)]'
+                      }`}
+                    >
+                      {settings.athan.selectedAthanId === athan.id && (
+                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]" />
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={async () => {
+                        const channelId = await selectAthan(athan, settings.athan.currentChannelId, 'main');
+                        updateAthan({ selectedAthanId: athan.id, currentChannelId: channelId });
+                      }}
+                    >
+                      <p className="text-[var(--color-text)] font-medium truncate">{athan.muezzinName}</p>
+                      <p className="text-sm text-[var(--color-muted)] truncate">
+                        {athan.title}{athan.duration ? ` - ${athan.duration}` : ''}
+                      </p>
+                    </div>
+
+                    {/* Preview button */}
+                    <button
+                      onClick={() => {
+                        if (previewingId === athan.id) {
+                          stopAthanPreview().catch(() => {});
+                          setPreviewingId(null);
+                        } else {
+                          stopPreview();
+                          playAthanPreview(athan.filename).then(() => setPreviewingId(athan.id)).catch(() => {});
+                        }
+                      }}
+                      className="p-2 rounded-lg hover:bg-[var(--color-border)] transition-colors flex-shrink-0"
+                    >
+                      {previewingId === athan.id ? (
+                        <svg className="w-5 h-5 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="6" y="4" width="4" height="16" rx="1" />
+                          <rect x="14" y="4" width="4" height="16" rx="1" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5 text-[var(--color-muted)]" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={async () => {
+                        stopPreview();
+                        await deleteAthanFile(athan.filename).catch(() => {});
+                        const newDownloaded = settings.athan.downloadedAthans.filter(a => a.id !== athan.id);
+                        const updates: Partial<typeof settings.athan> = { downloadedAthans: newDownloaded };
+                        if (settings.athan.selectedAthanId === athan.id) {
+                          if (settings.athan.currentChannelId) {
+                            AthanPlugin.deleteChannel({ channelId: settings.athan.currentChannelId }).catch(() => {});
+                          }
+                          updates.selectedAthanId = null;
+                          updates.currentChannelId = null;
+                        }
+                        if (settings.athan.selectedFajrAthanId === athan.id) {
+                          if (settings.athan.currentFajrChannelId) {
+                            AthanPlugin.deleteChannel({ channelId: settings.athan.currentFajrChannelId }).catch(() => {});
+                          }
+                          updates.selectedFajrAthanId = null;
+                          updates.currentFajrChannelId = null;
+                        }
+                        updateAthan(updates);
+                      }}
+                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+                    >
+                      <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+
+                {/* Separate Fajr toggle */}
+                <div className="mt-2">
+                  <ToggleRow
+                    label="Separate Fajr Athan"
+                    description="Use a different athan for Fajr prayer"
+                    checked={useSeparateFajr}
+                    onChange={(checked) => {
+                      setUseSeparateFajr(checked);
+                      if (!checked) {
+                        if (settings.athan.currentFajrChannelId) {
+                          AthanPlugin.deleteChannel({ channelId: settings.athan.currentFajrChannelId }).catch(() => {});
+                        }
+                        updateAthan({ selectedFajrAthanId: null, currentFajrChannelId: null });
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Fajr athan selection */}
+                {useSeparateFajr && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm text-[var(--color-muted)]">Fajr Athan</p>
+                    {settings.athan.downloadedAthans.map((athan) => (
+                      <div
+                        key={`fajr-${athan.id}`}
+                        onClick={async () => {
+                          const channelId = await selectAthan(athan, settings.athan.currentFajrChannelId, 'fajr');
+                          updateAthan({ selectedFajrAthanId: athan.id, currentFajrChannelId: channelId });
+                        }}
+                        className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors ${
+                          settings.athan.selectedFajrAthanId === athan.id
+                            ? 'bg-[var(--color-primary)]/10 border border-[var(--color-primary)]'
+                            : 'bg-[var(--color-card)] hover:bg-[var(--color-border)]'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          settings.athan.selectedFajrAthanId === athan.id ? 'border-[var(--color-primary)]' : 'border-[var(--color-muted)]'
+                        }`}>
+                          {settings.athan.selectedFajrAthanId === athan.id && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[var(--color-text)] font-medium truncate">{athan.muezzinName}</p>
+                          <p className="text-sm text-[var(--color-muted)] truncate">{athan.title}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {settings.athan.downloadedAthans.length === 0 && (
+              <div className="p-6 rounded-xl bg-[var(--color-card)] text-center">
+                <p className="text-[var(--color-muted)]">No athans downloaded yet.</p>
+                <p className="text-sm text-[var(--color-muted)] mt-1">
+                  Browse the catalog to download athan audio.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Athan Catalog Browser */}
+        {category === 'athan-catalog' && (
+          <AthanCatalogPanel
+            catalog={catalog}
+            setCatalog={setCatalog}
+            catalogLoading={catalogLoading}
+            setCatalogLoading={setCatalogLoading}
+            catalogError={catalogError}
+            setCatalogError={setCatalogError}
+            downloadedAthans={settings.athan.downloadedAthans}
+            onDownloaded={(athanFile) => {
+              updateAthan({
+                downloadedAthans: [...settings.athan.downloadedAthans, athanFile],
+              });
+            }}
+          />
         )}
 
         {/* Travel Mode Settings */}
@@ -1127,5 +1554,196 @@ function AutoIcon() {
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
+  );
+}
+
+function AthanIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+    </svg>
+  );
+}
+
+// Athan Catalog Panel Component
+function AthanCatalogPanel({
+  catalog,
+  setCatalog,
+  catalogLoading,
+  setCatalogLoading,
+  catalogError,
+  setCatalogError,
+  downloadedAthans,
+  onDownloaded,
+}: {
+  catalog: AthanCatalogEntry[];
+  setCatalog: (c: AthanCatalogEntry[]) => void;
+  catalogLoading: boolean;
+  setCatalogLoading: (l: boolean) => void;
+  catalogError: string | null;
+  setCatalogError: (e: string | null) => void;
+  downloadedAthans: AthanFile[];
+  onDownloaded: (file: AthanFile) => void;
+}) {
+  const [downloadingUrls, setDownloadingUrls] = useState<string[]>([]);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [audioRef] = useState(() => ({ current: null as HTMLAudioElement | null }));
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [audioRef]);
+
+  const togglePreview = (url: string) => {
+    if (previewUrl === url) {
+      // Stop current preview
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPreviewUrl(null);
+    } else {
+      // Stop previous and start new
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setPreviewUrl(null);
+        audioRef.current = null;
+      };
+      audio.play().catch(() => setPreviewUrl(null));
+      audioRef.current = audio;
+      setPreviewUrl(url);
+    }
+  };
+
+  useEffect(() => {
+    if (catalog.length === 0 && !catalogLoading) {
+      setCatalogLoading(true);
+      setCatalogError(null);
+      fetchAthanCatalog()
+        .then((entries) => setCatalog(entries))
+        .catch((err) => setCatalogError(err instanceof Error ? err.message : 'Failed to load catalog'))
+        .finally(() => setCatalogLoading(false));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isDownloaded = (url: string) =>
+    downloadedAthans.some((a) => a.sourceUrl === url);
+
+  const handleDownload = async (entry: AthanCatalogEntry) => {
+    if (downloadingUrls.includes(entry.sourceUrl) || isDownloaded(entry.sourceUrl)) return;
+
+    setDownloadError(null);
+    setDownloadingUrls(prev => [...prev, entry.sourceUrl]);
+    try {
+      const file = await downloadAthan(entry);
+      onDownloaded(file);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloadingUrls(prev => prev.filter(u => u !== entry.sourceUrl));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className="text-lg font-semibold text-[var(--color-text)]">Athan Catalog</h3>
+
+      {catalogLoading && (
+        <div className="p-6 rounded-xl bg-[var(--color-card)] text-center">
+          <p className="text-[var(--color-muted)]">Loading catalog...</p>
+        </div>
+      )}
+
+      {catalogError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+          <p className="text-red-500 text-sm">{catalogError}</p>
+          <button
+            onClick={() => {
+              setCatalogLoading(true);
+              setCatalogError(null);
+              fetchAthanCatalog()
+                .then((entries) => setCatalog(entries))
+                .catch((err) => setCatalogError(err instanceof Error ? err.message : 'Failed to load catalog'))
+                .finally(() => setCatalogLoading(false));
+            }}
+            className="mt-2 text-sm font-medium text-[var(--color-primary)]"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {downloadError && (
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          <p className="text-red-500 text-sm">{downloadError}</p>
+        </div>
+      )}
+
+      {!catalogLoading && !catalogError && catalog.length === 0 && (
+        <div className="p-6 rounded-xl bg-[var(--color-card)] text-center">
+          <p className="text-[var(--color-muted)]">No athans found in the catalog.</p>
+        </div>
+      )}
+
+      {catalog.map((entry, idx) => {
+        const downloaded = isDownloaded(entry.sourceUrl);
+        const downloading = downloadingUrls.includes(entry.sourceUrl);
+
+        return (
+          <div
+            key={idx}
+            className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-card)]"
+          >
+            {/* Preview button */}
+            <button
+              onClick={() => togglePreview(entry.sourceUrl)}
+              className="p-2 rounded-lg hover:bg-[var(--color-border)] transition-colors flex-shrink-0"
+            >
+              {previewUrl === entry.sourceUrl ? (
+                <svg className="w-5 h-5 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-[var(--color-muted)]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <p className="text-[var(--color-text)] font-medium truncate">{entry.muezzinName}</p>
+              <p className="text-sm text-[var(--color-muted)] truncate">
+                {entry.title}{entry.duration ? ` - ${entry.duration}` : ''}
+              </p>
+            </div>
+
+            {downloaded ? (
+              <span className="text-xs font-medium text-green-600 bg-green-500/10 px-2.5 py-1 rounded-full flex-shrink-0">
+                Downloaded
+              </span>
+            ) : (
+              <button
+                onClick={() => handleDownload(entry)}
+                disabled={downloading}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex-shrink-0"
+              >
+                {downloading ? 'Downloading...' : 'Download'}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

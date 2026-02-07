@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Preferences } from '@capacitor/preferences';
-import type { Settings, CalculationMethod, AsrCalculation, PrayerName, OptionalPrayersSettings, PrayerNotificationSettings, NotificationSound, JumuahSettings, TravelSettings, DisplaySettings } from '../types';
+import type { Settings, CalculationMethod, AsrCalculation, PrayerName, OptionalPrayersSettings, PrayerNotificationSettings, NotificationSound, JumuahSettings, TravelSettings, DisplaySettings, AthanSettings, SavedLocation } from '../types';
 
 const SETTINGS_KEY = 'ontime_settings';
 
@@ -22,6 +22,14 @@ const defaultDisplaySettings: DisplaySettings = {
   showCurrentPrayer: true,
   showNextPrayer: true,
   showSunnahCard: true,
+};
+
+export const defaultAthanSettings: AthanSettings = {
+  downloadedAthans: [],
+  selectedAthanId: null,
+  selectedFajrAthanId: null,
+  currentChannelId: null,
+  currentFajrChannelId: null,
 };
 
 export const defaultTravelSettings: TravelSettings = {
@@ -59,6 +67,8 @@ const defaultSettings: Settings = {
   jumuah: defaultJumuahSettings,
   travel: defaultTravelSettings,
   display: defaultDisplaySettings,
+  athan: defaultAthanSettings,
+  previousLocations: [],
 };
 
 interface SettingsContextType {
@@ -73,6 +83,9 @@ interface SettingsContextType {
   updateJumuah: (updates: Partial<JumuahSettings>) => void;
   updateTravel: (updates: Partial<TravelSettings>) => void;
   updateDisplay: (updates: Partial<DisplaySettings>) => void;
+  updateAthan: (updates: Partial<AthanSettings>) => void;
+  addPreviousLocation: (loc: SavedLocation) => void;
+  removePreviousLocation: (index: number) => void;
   isLoading: boolean;
 }
 
@@ -146,6 +159,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             ...defaultDisplaySettings,
             ...parsed.display,
           },
+          athan: {
+            ...defaultAthanSettings,
+            ...parsed.athan,
+          },
+          previousLocations: parsed.previousLocations || [],
         });
       }
     } catch (error) {
@@ -248,6 +266,38 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }));
   }
 
+  function updateAthan(updates: Partial<AthanSettings>) {
+    setSettings((prev) => ({
+      ...prev,
+      athan: {
+        ...prev.athan,
+        ...updates,
+      },
+    }));
+  }
+
+  function addPreviousLocation(loc: SavedLocation) {
+    setSettings((prev) => {
+      // Don't add duplicates (same city name and close coordinates)
+      const isDuplicate = prev.previousLocations.some(
+        (p) => p.cityName === loc.cityName &&
+          Math.abs(p.coordinates.latitude - loc.coordinates.latitude) < 0.01 &&
+          Math.abs(p.coordinates.longitude - loc.coordinates.longitude) < 0.01
+      );
+      if (isDuplicate) return prev;
+      // Keep max 20 previous locations
+      const updated = [loc, ...prev.previousLocations].slice(0, 20);
+      return { ...prev, previousLocations: updated };
+    });
+  }
+
+  function removePreviousLocation(index: number) {
+    setSettings((prev) => ({
+      ...prev,
+      previousLocations: prev.previousLocations.filter((_, i) => i !== index),
+    }));
+  }
+
   return (
     <SettingsContext.Provider
       value={{
@@ -262,6 +312,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateJumuah,
         updateTravel,
         updateDisplay,
+        updateAthan,
+        addPreviousLocation,
+        removePreviousLocation,
         isLoading,
       }}
     >

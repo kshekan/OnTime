@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { Preferences } from '@capacitor/preferences';
 import { usePrayerTimes } from './hooks/usePrayerTimes';
 import { useNotifications } from './hooks/useNotifications';
 import { useTheme } from './context/ThemeContext';
@@ -11,18 +12,29 @@ import { LocationDisplay } from './components/LocationDisplay';
 import { QiblaCompass } from './components/QiblaCompass';
 import { SettingsModal } from './components/SettingsModal';
 import { Dashboard } from './components/Dashboard';
+import { OnboardingScreen } from './components/OnboardingScreen';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faKaaba } from '@fortawesome/free-solid-svg-icons';
+
+const ONBOARDING_KEY = 'ontime_onboarding_complete';
 
 function App() {
   const [isQiblaOpen, setIsQiblaOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-  
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
   const { prayers, currentPrayer, nextPrayer, nextPrayerTime, countdown } = usePrayerTimes();
   const { effectiveTheme, updatePrayerTimes } = useTheme();
   const { travelState } = useTravel();
   const { settings } = useSettings();
+
+  // Check if onboarding is needed
+  useEffect(() => {
+    Preferences.get({ key: ONBOARDING_KEY }).then(({ value }) => {
+      setShowOnboarding(value !== 'true');
+    });
+  }, []);
 
   // Set up push notifications
   useNotifications(prayers);
@@ -40,6 +52,21 @@ function App() {
     const maghrib = prayers.find(p => p.name === 'maghrib')?.time || null;
     updatePrayerTimes(fajr, maghrib);
   }, [prayers, updatePrayerTimes]);
+
+  // Show nothing while checking onboarding status
+  if (showOnboarding === null) return null;
+
+  // Show onboarding on first launch
+  if (showOnboarding) {
+    return (
+      <OnboardingScreen
+        onComplete={async () => {
+          await Preferences.set({ key: ONBOARDING_KEY, value: 'true' });
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] safe-area-top safe-area-bottom">

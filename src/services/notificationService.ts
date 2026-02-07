@@ -1,5 +1,5 @@
 import { LocalNotifications, type ScheduleOptions } from '@capacitor/local-notifications';
-import type { PrayerTime, PrayerName, AllPrayerNames, Settings, NotificationSound, JumuahSettings } from '../types';
+import type { PrayerTime, PrayerName, AllPrayerNames, Settings, NotificationSound, JumuahSettings, AthanSettings } from '../types';
 
 // Base IDs for each prayer (we'll add offsets for reminder vs at-time)
 const PRAYER_BASE_IDS: Record<PrayerName, number> = {
@@ -77,6 +77,23 @@ function getSoundForNotification(sound: NotificationSound): string | undefined {
   return SOUND_FILES[sound];
 }
 
+// Resolve the notification channel ID based on prayer, sound, and athan settings
+function resolveChannelId(
+  prayer: PrayerName,
+  sound: NotificationSound,
+  athanSettings: AthanSettings,
+): string | undefined {
+  // Fajr with dedicated fajr channel
+  if (prayer === 'fajr' && (sound === 'adhan_fajr' || sound === 'adhan') && athanSettings.currentFajrChannelId) {
+    return athanSettings.currentFajrChannelId;
+  }
+  // Any prayer with athan sound and main channel
+  if ((sound === 'adhan' || sound === 'adhan_fajr') && athanSettings.currentChannelId) {
+    return athanSettings.currentChannelId;
+  }
+  return undefined;
+}
+
 export async function scheduleNotifications(
   prayers: PrayerTime[],
   settings: Settings
@@ -124,6 +141,7 @@ export async function scheduleNotifications(
 
         if (reminderTime > now) {
           const sound = getSoundForNotification(prayerSettings.sound);
+          const channelId = resolveChannelId(prayer.name, prayerSettings.sound, settings.athan);
           notifications.push({
             id: getNotificationId(prayer.name, dayOffset, false),
             title: prayer.label,
@@ -133,6 +151,7 @@ export async function scheduleNotifications(
               allowWhileIdle: true,
             },
             sound: sound || 'default',
+            channelId,
             smallIcon: 'ic_stat_icon',
             largeIcon: 'ic_launcher',
           });
@@ -142,6 +161,7 @@ export async function scheduleNotifications(
       // Schedule at-time notification
       if (prayerSettings.atPrayerTime && prayerTime > now) {
         const sound = getSoundForNotification(prayerSettings.sound);
+        const channelId = resolveChannelId(prayer.name, prayerSettings.sound, settings.athan);
         notifications.push({
           id: getNotificationId(prayer.name, dayOffset, true),
           title: prayer.label,
@@ -151,6 +171,7 @@ export async function scheduleNotifications(
             allowWhileIdle: true,
           },
           sound: sound || 'default',
+          channelId,
           smallIcon: 'ic_stat_icon',
           largeIcon: 'ic_launcher',
         });

@@ -120,6 +120,13 @@ export interface DisplaySettings {
   showSunnahCard: boolean;
 }
 
+export interface SavedLocation {
+  coordinates: Coordinates;
+  cityName: string;
+  countryCode?: string;
+  savedAt: string; // ISO date
+}
+
 export interface Settings {
   calculationMethod: CalculationMethod;
   asrCalculation: AsrCalculation;
@@ -128,6 +135,8 @@ export interface Settings {
   jumuah: JumuahSettings;
   travel: TravelSettings;
   display: DisplaySettings;
+  athan: AthanSettings;
+  previousLocations: SavedLocation[];
 }
 
 export interface CityEntry {
@@ -143,4 +152,29 @@ export interface NotificationPreference {
   prayer: PrayerName;
   enabled: boolean;
   minutesBefore: number;
+}
+
+export interface AthanFile {
+  id: string;
+  muezzinName: string;
+  title: string;
+  filename: string;
+  duration: string;
+  sourceUrl: string;
+  downloadedAt: string; // ISO date
+}
+
+export interface AthanCatalogEntry {
+  muezzinName: string;
+  title: string;
+  duration: string;
+  sourceUrl: string;
+}
+
+export interface AthanSettings {
+  downloadedAthans: AthanFile[];
+  selectedAthanId: string | null;
+  selectedFajrAthanId: string | null;
+  currentChannelId: string | null;
+  currentFajrChannelId: string | null;
 }

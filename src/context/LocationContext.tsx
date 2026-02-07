@@ -33,15 +33,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function initializeLocation() {
-    // Try to load saved location
+    // Try to load saved location — onboarding handles initial GPS request
     const savedLocation = await loadSavedLocation();
     if (savedLocation) {
       setLocation(savedLocation);
-      setIsLoading(false);
-      return;
     }
-
-    // No saved location — use Mecca default, let user pick a city or use GPS
     setIsLoading(false);
   }
 
