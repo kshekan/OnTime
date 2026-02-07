@@ -133,14 +133,6 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             <p className="text-[var(--color-muted)] mb-8 leading-relaxed">
               Prayer times are calculated based on your location. Allow GPS access for accurate times wherever you are.
             </p>
-            {notifGranted && (
-              <div className="mb-6 flex items-center justify-center gap-2 text-green-600 text-sm">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                Notifications enabled
-              </div>
-            )}
             <button
               onClick={handleLocationPermission}
               className="w-full py-3.5 bg-blue-500 text-white font-semibold rounded-xl text-lg mb-3"

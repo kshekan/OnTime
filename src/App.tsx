@@ -41,8 +41,9 @@ function App() {
 
   // Configure status bar to match theme
   useEffect(() => {
-    StatusBar.setStyle({ style: effectiveTheme === 'dark' ? Style.Dark : Style.Light }).catch(() => {});
-    StatusBar.setBackgroundColor({ color: effectiveTheme === 'dark' ? '#0F0F0F' : '#FAFAFA' }).catch(() => {});
+    StatusBar.setStyle({ style: effectiveTheme === 'light' ? Style.Light : Style.Dark }).catch(() => {});
+    const statusBarColors: Record<string, string> = { light: '#FAFAFA', dark: '#0F0F0F', desert: '#1C1510', rose: '#160D14' };
+    StatusBar.setBackgroundColor({ color: statusBarColors[effectiveTheme] }).catch(() => {});
     StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
   }, [effectiveTheme]);
 

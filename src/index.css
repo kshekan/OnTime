@@ -22,9 +22,35 @@
   --color-text: #F5F6F8;
   --color-muted: #9CA3AF;
   --color-border: #2A2E38;
-  
+
   --color-highlight: #2A3050;
   --color-highlight-text: #FFFFFF;
+}
+
+/* Rose / Feminine theme */
+.rose {
+  --color-background: #160D14;
+  --color-card: #241A22;
+  --color-primary: #D4619C;
+  --color-text: #F5EAF0;
+  --color-muted: #B08AA0;
+  --color-border: #3A2836;
+
+  --color-highlight: #3A2040;
+  --color-highlight-text: #F5EAF0;
+}
+
+/* Desert / Islamic theme */
+.desert {
+  --color-background: #1C1510;
+  --color-card: #2A2018;
+  --color-primary: #C8954C;
+  --color-text: #F2E8D9;
+  --color-muted: #A89278;
+  --color-border: #3D3024;
+
+  --color-highlight: #3D2E1A;
+  --color-highlight-text: #F2E8D9;
 }
 
 html, body, #root {

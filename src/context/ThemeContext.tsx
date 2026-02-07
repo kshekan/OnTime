@@ -2,13 +2,15 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { Preferences } from '@capacitor/preferences';
 
 // 'auto' = dark after Maghrib, light after Fajr
-export type Theme = 'light' | 'dark' | 'system' | 'auto';
+export type Theme = 'light' | 'dark' | 'system' | 'auto' | 'desert' | 'rose';
 
 const THEME_KEY = 'ontime_theme';
 
+type EffectiveTheme = 'light' | 'dark' | 'desert' | 'rose';
+
 interface ThemeContextType {
   theme: Theme;
-  effectiveTheme: 'light' | 'dark';
+  effectiveTheme: EffectiveTheme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   updatePrayerTimes: (fajrTime: Date | null, maghribTime: Date | null) => void;
@@ -50,9 +52,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [maghribTime, setMaghribTime] = useState<Date | null>(null);
 
   // Calculate effective theme based on mode
-  const effectiveTheme = 
-    theme === 'system' ? systemTheme : 
-    theme === 'auto' ? prayerBasedTheme : 
+  const effectiveTheme: EffectiveTheme =
+    theme === 'system' ? systemTheme :
+    theme === 'auto' ? prayerBasedTheme :
     theme;
 
   // Update prayer times from the app
@@ -96,24 +98,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Apply theme to document
   useEffect(() => {
     const root = document.documentElement;
-    
-    if (effectiveTheme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+
+    root.classList.remove('dark', 'desert', 'rose');
+    if (effectiveTheme !== 'light') {
+      root.classList.add(effectiveTheme);
     }
 
     // Update theme-color meta tag
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
-      themeColorMeta.setAttribute('content', effectiveTheme === 'dark' ? '#0F0F0F' : '#FAFAFA');
+      const colors: Record<EffectiveTheme, string> = { light: '#FAFAFA', dark: '#0F0F0F', desert: '#1C1510', rose: '#160D14' };
+      themeColorMeta.setAttribute('content', colors[effectiveTheme]);
     }
   }, [effectiveTheme]);
 
   async function loadTheme() {
     try {
       const { value } = await Preferences.get({ key: THEME_KEY });
-      if (value && ['light', 'dark', 'system', 'auto'].includes(value)) {
+      if (value && ['light', 'dark', 'system', 'auto', 'desert', 'rose'].includes(value)) {
         setThemeState(value as Theme);
       }
     } catch (error) {

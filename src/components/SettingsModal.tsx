@@ -150,7 +150,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     return method?.label || settings.calculationMethod;
   };
   const getAppearanceSummary = () => {
-    const themeLabels = { light: 'Light', dark: 'Dark', system: 'System', auto: 'Auto (Prayer)' };
+    const themeLabels = { light: 'Light', dark: 'Dark', system: 'System', auto: 'Auto (Prayer)', desert: 'Desert', rose: 'Rose' };
     return themeLabels[theme];
   };
   const getJumuahSummary = () => {
@@ -265,59 +265,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-text)]">Location</h3>
 
-            {/* Current Location Display */}
-            <div className="p-4 rounded-xl bg-[var(--color-card)]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[var(--color-text)] font-medium">{location.cityName}</p>
-                  <p className="text-sm text-[var(--color-muted)]">
-                    {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
-                  </p>
-                </div>
-                {settings.travel.homeBase?.cityName === location.cityName && (
-                  <span className="text-xs bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-1 rounded-full font-medium">Home</span>
-                )}
-              </div>
-
-              {/* Set as Home button */}
-              {settings.travel.homeBase?.cityName !== location.cityName && (
-                <button
-                  onClick={() => {
-                    setHomeBase({
-                      coordinates: location.coordinates,
-                      cityName: location.cityName,
-                      countryCode: location.countryCode,
-                    });
-                    addPreviousLocation({
-                      coordinates: location.coordinates,
-                      cityName: location.cityName,
-                      countryCode: location.countryCode,
-                      savedAt: new Date().toISOString(),
-                    });
-                    if (!settings.travel.enabled) {
-                      toggleTravelEnabled();
-                    }
-                  }}
-                  className="mt-3 w-full py-2.5 border border-[var(--color-primary)] text-[var(--color-primary)] rounded-xl font-medium text-sm flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-                  </svg>
-                  Set as Home
-                </button>
-              )}
-
-              {/* Tooltip */}
-              <div className="mt-3 flex items-start gap-2 bg-[var(--color-background)] rounded-lg p-2.5">
-                <svg className="w-4 h-4 text-[var(--color-muted)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                </svg>
-                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
-                  Setting a home location enables travel mode. When you're more than {Math.round(settings.travel.distanceThresholdKm * 0.621)} miles from home, prayers are automatically shortened (Qasr) per Islamic travel rulings.
-                </p>
-              </div>
-            </div>
-
             {/* Method Picker */}
             <div className="p-4 rounded-xl bg-[var(--color-card)]">
               <p className="text-sm text-[var(--color-muted)] mb-2">Set Location</p>
@@ -326,7 +273,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   active={locationMethod === 'search'}
                   onClick={() => setLocationMethod(locationMethod === 'search' ? null : 'search')}
                 >
-                  Search City
+                  Search
                 </ToggleButton>
                 <ToggleButton
                   active={locationMethod === 'gps'}
@@ -341,6 +288,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   Coordinates
                 </ToggleButton>
               </div>
+            </div>
+
+            {/* Travel mode info */}
+            <div className="flex items-start gap-2.5 px-1">
+              <svg className="w-4 h-4 text-[var(--color-primary)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                Setting a home location enables travel mode. When you're more than {Math.round(settings.travel.distanceThresholdKm * 0.621)} miles from home, prayers are automatically shortened (Qasr) per Islamic travel rulings.
+              </p>
             </div>
 
             {/* GPS */}
@@ -604,7 +561,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             
             <div>
               <label className="block text-sm text-[var(--color-muted)] mb-2">Theme</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <ThemeOption
                   active={theme === 'light'}
                   onClick={() => setTheme('light')}
@@ -616,6 +573,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   onClick={() => setTheme('dark')}
                   icon={<MoonIcon />}
                   label="Dark"
+                />
+                <ThemeOption
+                  active={theme === 'desert'}
+                  onClick={() => setTheme('desert')}
+                  icon={<DesertIcon />}
+                  label="Desert"
+                />
+                <ThemeOption
+                  active={theme === 'rose'}
+                  onClick={() => setTheme('rose')}
+                  icon={<RoseIcon />}
+                  label="Rose"
                 />
                 <ThemeOption
                   active={theme === 'system'}
@@ -1423,9 +1392,9 @@ function ToggleButton({
       onClick={onClick}
       className={`
         flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all
-        ${active 
-          ? 'bg-[var(--color-primary)] text-white' 
-          : 'bg-[var(--color-card)] text-[var(--color-text)] hover:bg-[var(--color-border)]'
+        ${active
+          ? 'bg-[var(--color-primary)] text-white'
+          : 'bg-[var(--color-card)] text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-border)]'
         }
       `}
     >
@@ -1553,6 +1522,24 @@ function AutoIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function RoseIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+    </svg>
+  );
+}
+
+function DesertIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1.5M18.364 5.636l-1.06 1.06M21 12h-1.5M18.364 18.364l-1.06-1.06M12 19.5V21M7.696 7.696l-1.06-1.06M4.5 12H3m4.696 6.364l-1.06 1.06" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9a3 3 0 100 6 3 3 0 000-6z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 18c2-3 5-4 9-4s7 1 9 4" />
     </svg>
   );
 }

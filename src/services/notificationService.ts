@@ -146,7 +146,7 @@ export async function scheduleNotifications(
           notifications.push({
             id: getNotificationId(prayer.name, dayOffset, false),
             title: prayer.label,
-            body: `${PRAYER_MESSAGES[prayer.name].reminder} - ${prayerSettings.reminderMinutes} min`,
+            body: `${PRAYER_MESSAGES[prayer.name].reminder} - in ${prayerSettings.reminderMinutes} min`,
             schedule: {
               at: reminderTime,
               allowWhileIdle: true,
@@ -166,7 +166,7 @@ export async function scheduleNotifications(
         notifications.push({
           id: getNotificationId(prayer.name, dayOffset, true),
           title: prayer.label,
-          body: PRAYER_MESSAGES[prayer.name].atTime,
+          body: `${PRAYER_MESSAGES[prayer.name].atTime} - now`,
           schedule: {
             at: prayerTime,
             allowWhileIdle: true,
