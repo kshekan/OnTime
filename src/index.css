@@ -53,6 +53,32 @@
   --color-highlight-text: #F2E8D9;
 }
 
+/* Forest / Green theme */
+.forest {
+  --color-background: #0C1510;
+  --color-card: #162118;
+  --color-primary: #4CAF6A;
+  --color-text: #E8F2EC;
+  --color-muted: #88A894;
+  --color-border: #253D2C;
+
+  --color-highlight: #1A3D24;
+  --color-highlight-text: #E8F2EC;
+}
+
+/* Ocean / Deep blue-teal theme */
+.ocean {
+  --color-background: #0A1018;
+  --color-card: #141E2C;
+  --color-primary: #4A9EC8;
+  --color-text: #E4EEF5;
+  --color-muted: #7EA0B8;
+  --color-border: #1E3348;
+
+  --color-highlight: #1A3050;
+  --color-highlight-text: #E4EEF5;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;

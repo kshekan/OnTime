@@ -2,11 +2,11 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { Preferences } from '@capacitor/preferences';
 
 // 'auto' = dark after Maghrib, light after Fajr
-export type Theme = 'light' | 'dark' | 'system' | 'auto' | 'desert' | 'rose';
+export type Theme = 'light' | 'dark' | 'system' | 'auto' | 'desert' | 'rose' | 'forest' | 'ocean';
 
 const THEME_KEY = 'ontime_theme';
 
-type EffectiveTheme = 'light' | 'dark' | 'desert' | 'rose';
+type EffectiveTheme = 'light' | 'dark' | 'desert' | 'rose' | 'forest' | 'ocean';
 
 interface ThemeContextType {
   theme: Theme;
@@ -99,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
 
-    root.classList.remove('dark', 'desert', 'rose');
+    root.classList.remove('dark', 'desert', 'rose', 'forest', 'ocean');
     if (effectiveTheme !== 'light') {
       root.classList.add(effectiveTheme);
     }
@@ -107,7 +107,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Update theme-color meta tag
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
-      const colors: Record<EffectiveTheme, string> = { light: '#FAFAFA', dark: '#0F0F0F', desert: '#1C1510', rose: '#160D14' };
+      const colors: Record<EffectiveTheme, string> = { light: '#FAFAFA', dark: '#0F0F0F', desert: '#1C1510', rose: '#160D14', forest: '#0C1510', ocean: '#0A1018' };
       themeColorMeta.setAttribute('content', colors[effectiveTheme]);
     }
   }, [effectiveTheme]);
@@ -115,7 +115,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   async function loadTheme() {
     try {
       const { value } = await Preferences.get({ key: THEME_KEY });
-      if (value && ['light', 'dark', 'system', 'auto', 'desert', 'rose'].includes(value)) {
+      if (value && ['light', 'dark', 'system', 'auto', 'desert', 'rose', 'forest', 'ocean'].includes(value)) {
         setThemeState(value as Theme);
       }
     } catch (error) {

@@ -174,7 +174,7 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
     return method?.label || settings.calculationMethod;
   };
   const getAppearanceSummary = () => {
-    const themeLabels = { light: 'Light', dark: 'Dark', system: 'System', auto: 'Auto (Prayer)', desert: 'Desert', rose: 'Rose' };
+    const themeLabels = { light: 'Light', dark: 'Dark', system: 'System', auto: 'Auto (Prayer)', desert: 'Desert', rose: 'Rose', forest: 'Forest', ocean: 'Ocean' };
     return themeLabels[theme];
   };
   const getJumuahSummary = () => {
@@ -610,6 +610,20 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                   label="Rose"
                   swatches={['#160D14', '#241A22', '#D4619C', '#3A2836']}
                   colors={{ bg: '#241A22', text: '#F5EAF0', border: '#3A2836', primary: '#D4619C' }}
+                />
+                <ThemeOption
+                  active={theme === 'forest'}
+                  onClick={() => setTheme('forest')}
+                  label="Forest"
+                  swatches={['#0C1510', '#162118', '#4CAF6A', '#253D2C']}
+                  colors={{ bg: '#162118', text: '#E8F2EC', border: '#253D2C', primary: '#4CAF6A' }}
+                />
+                <ThemeOption
+                  active={theme === 'ocean'}
+                  onClick={() => setTheme('ocean')}
+                  label="Ocean"
+                  swatches={['#0A1018', '#141E2C', '#4A9EC8', '#1E3348']}
+                  colors={{ bg: '#141E2C', text: '#E4EEF5', border: '#1E3348', primary: '#4A9EC8' }}
                 />
                 <ThemeOption
                   active={theme === 'system'}
