@@ -34,9 +34,7 @@ export const defaultAthanSettings: AthanSettings = {
 
 export const defaultSurahKahfSettings: SurahKahfSettings = {
   enabled: false,
-  notifyAtMaghrib: true,
-  fridayReminder: true,
-  fridayReminderTime: '09:00',
+  repeatIntervalHours: 0,
 };
 
 export const defaultTravelSettings: TravelSettings = {
@@ -174,7 +172,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           },
           surahKahf: {
             ...defaultSurahKahfSettings,
-            ...parsed.surahKahf,
+            enabled: parsed.surahKahf?.enabled ?? defaultSurahKahfSettings.enabled,
+            repeatIntervalHours: parsed.surahKahf?.repeatIntervalHours ?? defaultSurahKahfSettings.repeatIntervalHours,
           },
           previousLocations: parsed.previousLocations || [],
         });

@@ -16,7 +16,7 @@ import {
 import { AthanPlugin } from '../plugins/athanPlugin';
 import type { CalculationMethod, PrayerName, NotificationSound, CityEntry, AthanCatalogEntry, AthanFile } from '../types';
 
-type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'jumuah' | 'notifications' | 'travel' | 'about' | 'travel-home-search' | 'athan' | 'athan-catalog' | 'surah-kahf';
+type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'notifications' | 'notifications-prayers' | 'notifications-athan' | 'notifications-jumuah' | 'notifications-kahf' | 'travel' | 'about' | 'travel-home-search' | 'athan-catalog';
 
 const PRAYER_LABELS: Record<PrayerName, string> = {
   fajr: 'Fajr',
@@ -110,6 +110,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     return () => { handle?.then(h => h.remove()); };
   }, []);
 
+  // Auto-navigate back to hub if notifications get disabled while on a sub-page
+  useEffect(() => {
+    if (!settings.notifications.enabled && category.startsWith('notifications-')) {
+      setCategory('notifications');
+    }
+  }, [settings.notifications.enabled, category]);
+
   if (!isOpen) return null;
 
   const handleSaveManualLocation = () => {
@@ -133,7 +140,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       return;
     }
     if (category === 'athan-catalog') {
-      setCategory('athan');
+      setCategory('notifications-athan');
+      return;
+    }
+    if (category.startsWith('notifications-')) {
+      setCategory('notifications');
       return;
     }
     setCategory('main');
@@ -160,8 +171,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
   const getNotificationsSummary = () => {
     if (!settings.notifications.enabled) return 'Off';
+    const parts: string[] = [];
     const enabledCount = Object.values(settings.notifications.prayers).filter(p => p.enabled).length;
-    return `${enabledCount} prayers`;
+    parts.push(`${enabledCount} prayers`);
+    if (settings.jumuah.enabled) parts.push("Jumu'ah");
+    if (settings.surahKahf.enabled) parts.push('Kahf');
+    return parts.join(', ');
   };
   const getAthanSummary = () => {
     const selected = settings.athan.downloadedAthans.find(a => a.id === settings.athan.selectedAthanId);
@@ -170,7 +185,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
   const getSurahKahfSummary = () => {
     if (!settings.surahKahf.enabled) return 'Off';
-    return 'Enabled';
+    if (settings.surahKahf.repeatIntervalHours > 0) return `Every ${settings.surahKahf.repeatIntervalHours}h`;
+    return 'At Maghrib';
   };
   const getTravelSummary = () => {
     if (!settings.travel.enabled) return 'Off';
@@ -233,28 +249,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               onClick={() => setCategory('appearance')}
             />
             <CategoryItem
-              icon={<MosqueIcon />}
-              title="Jumu'ah"
-              summary={getJumuahSummary()}
-              onClick={() => setCategory('jumuah')}
-            />
-            <CategoryItem
-              icon={<BookIcon />}
-              title="Surah Al-Kahf"
-              summary={getSurahKahfSummary()}
-              onClick={() => setCategory('surah-kahf')}
-            />
-            <CategoryItem
               icon={<NotificationIcon />}
               title="Notifications"
               summary={getNotificationsSummary()}
               onClick={() => setCategory('notifications')}
-            />
-            <CategoryItem
-              icon={<AthanIcon />}
-              title="Athan Sounds"
-              summary={getAthanSummary()}
-              onClick={() => setCategory('athan')}
             />
             <CategoryItem
               icon={<TravelIcon />}
@@ -647,7 +645,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         )}
 
         {/* Jumuah Settings */}
-        {category === 'jumuah' && (
+        {category === 'notifications-jumuah' && (
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-text)]">Jumu'ah (Friday Prayer)</h3>
             
@@ -758,7 +756,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         )}
 
         {/* Surah Kahf Settings */}
-        {category === 'surah-kahf' && (
+        {category === 'notifications-kahf' && (
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-text)]">Surah Al-Kahf Reminder</h3>
 
@@ -767,163 +765,184 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
               <p className="text-xs text-[var(--color-muted)] leading-relaxed">
-                In the Islamic calendar, the day begins at Maghrib. So Friday starts at Thursday's Maghrib time. Reading Surah Al-Kahf on Friday is a recommended Sunnah.
+                In the Islamic calendar, the day begins at Maghrib. So Friday starts at Thursday's Maghrib time and ends at Friday's Maghrib. You'll be reminded at Thursday Maghrib, with optional repeat reminders until Friday Maghrib.
               </p>
             </div>
 
             <ToggleRow
               label="Enable Surah Al-Kahf Reminder"
-              description="Get reminded to read Surah Al-Kahf every week"
+              description="Reminded at Thursday Maghrib every week"
               checked={settings.surahKahf.enabled}
               onChange={(checked) => updateSurahKahf({ enabled: checked })}
             />
 
             {settings.surahKahf.enabled && (
-              <>
-                <ToggleRow
-                  label="Notify at Thursday Maghrib"
-                  description="When Islamic Friday begins"
-                  checked={settings.surahKahf.notifyAtMaghrib}
-                  onChange={(checked) => updateSurahKahf({ notifyAtMaghrib: checked })}
-                />
-
-                <ToggleRow
-                  label="Friday Morning Reminder"
-                  description="Follow-up reminder on Friday"
-                  checked={settings.surahKahf.fridayReminder}
-                  onChange={(checked) => updateSurahKahf({ fridayReminder: checked })}
-                />
-
-                {settings.surahKahf.fridayReminder && (
-                  <div className="p-4 rounded-lg bg-[var(--color-card)]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[var(--color-text)] font-medium">Reminder Time</p>
-                        <p className="text-sm text-[var(--color-muted)]">When to remind on Friday</p>
-                      </div>
-                      <input
-                        type="time"
-                        value={settings.surahKahf.fridayReminderTime}
-                        onChange={(e) => updateSurahKahf({ fridayReminderTime: e.target.value })}
-                        className="px-3 py-2 rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)]"
-                      />
-                    </div>
+              <div className="p-4 rounded-lg bg-[var(--color-card)]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[var(--color-text)] font-medium">Repeat Reminder</p>
+                    <p className="text-sm text-[var(--color-muted)]">Keep reminding until Friday Maghrib</p>
                   </div>
-                )}
-              </>
+                  <select
+                    value={settings.surahKahf.repeatIntervalHours}
+                    onChange={(e) => updateSurahKahf({ repeatIntervalHours: parseInt(e.target.value) })}
+                    className="px-4 py-2 rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)]"
+                  >
+                    <option value={0}>Off</option>
+                    <option value={2}>Every 2 hours</option>
+                    <option value={4}>Every 4 hours</option>
+                    <option value={6}>Every 6 hours</option>
+                    <option value={8}>Every 8 hours</option>
+                  </select>
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* Notifications Settings */}
+        {/* Notifications Hub */}
         {category === 'notifications' && (
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-text)]">Notifications</h3>
-            
+
             <ToggleRow
               label="Enable Notifications"
               description="Get notified for prayer times"
               checked={settings.notifications.enabled}
               onChange={(checked) => updateNotifications(checked)}
             />
-            
+
             {settings.notifications.enabled && (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-[var(--color-muted)]">
-                  Configure notifications for each prayer
-                </p>
-                {(Object.keys(PRAYER_LABELS) as PrayerName[]).map((prayer) => {
-                  const prayerSettings = settings.notifications.prayers[prayer];
-                  return (
-                    <div 
-                      key={prayer}
-                      className="p-4 rounded-lg bg-[var(--color-card)]"
-                    >
-                      <div
-                        className="flex items-center justify-between mb-2 cursor-pointer"
-                        onClick={() => updatePrayerNotification(prayer, { enabled: !prayerSettings.enabled })}
-                      >
-                        <span className="font-medium text-[var(--color-text)]">
-                          {PRAYER_LABELS[prayer]}
-                        </span>
-                        <div className={`
-                          relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200
-                          ${prayerSettings.enabled ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'}
-                        `}>
-                          <div className={`
-                            absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200
-                            ${prayerSettings.enabled ? 'translate-x-5' : 'translate-x-0'}
-                          `} />
-                        </div>
-                      </div>
-                      
-                      {prayerSettings.enabled && (
-                        <div className="flex flex-col gap-3 pt-3 border-t border-[var(--color-border)]">
-                          {/* At Prayer Time */}
-                          <div
-                            className="flex items-center justify-between cursor-pointer"
-                            onClick={() => updatePrayerNotification(prayer, { atPrayerTime: !prayerSettings.atPrayerTime })}
-                          >
-                            <span className="text-sm text-[var(--color-muted)]">At prayer time</span>
-                            <div className={`
-                              relative w-9 h-5 rounded-full flex-shrink-0 transition-colors duration-200
-                              ${prayerSettings.atPrayerTime ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'}
-                            `}>
-                              <div className={`
-                                absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
-                                ${prayerSettings.atPrayerTime ? 'translate-x-4' : 'translate-x-0'}
-                              `} />
-                            </div>
-                          </div>
-                          
-                          {/* Reminder */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-[var(--color-muted)]">Reminder before</span>
-                            <select
-                              value={prayerSettings.reminderMinutes}
-                              onChange={(e) => updatePrayerNotification(prayer, { reminderMinutes: parseInt(e.target.value) })}
-                              className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)]"
-                            >
-                              {REMINDER_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          {/* Sound */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm text-[var(--color-muted)] flex-shrink-0">Sound</span>
-                            <select
-                              value={prayerSettings.sound}
-                              onChange={(e) => updatePrayerNotification(prayer, { sound: e.target.value as NotificationSound })}
-                              className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)] max-w-[60%] truncate"
-                            >
-                              {BUILT_IN_SOUND_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                              {settings.athan.downloadedAthans.length > 0 && (
-                                <optgroup label="Downloaded Athans">
-                                  {settings.athan.downloadedAthans.map((athan) => (
-                                    <option key={athan.id} value={`athan:${athan.id}`}>
-                                      {athan.muezzinName} — {athan.title}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-4">
+                <CategoryItem
+                  icon={<NotificationIcon />}
+                  title="Prayer Notifications"
+                  summary={`${Object.values(settings.notifications.prayers).filter(p => p.enabled).length} prayers enabled`}
+                  onClick={() => setCategory('notifications-prayers')}
+                />
+                <CategoryItem
+                  icon={<AthanIcon />}
+                  title="Athan Sounds"
+                  summary={getAthanSummary()}
+                  onClick={() => setCategory('notifications-athan')}
+                />
+                <CategoryItem
+                  icon={<MosqueIcon />}
+                  title="Jumu'ah"
+                  summary={getJumuahSummary()}
+                  onClick={() => setCategory('notifications-jumuah')}
+                />
+                <CategoryItem
+                  icon={<BookIcon />}
+                  title="Surah Al-Kahf"
+                  summary={getSurahKahfSummary()}
+                  onClick={() => setCategory('notifications-kahf')}
+                />
               </div>
             )}
           </div>
         )}
 
+        {/* Prayer Notifications */}
+        {category === 'notifications-prayers' && (
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-[var(--color-text)]">Prayer Notifications</h3>
+
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-[var(--color-muted)]">
+                Configure notifications for each prayer
+              </p>
+              {(Object.keys(PRAYER_LABELS) as PrayerName[]).map((prayer) => {
+                const prayerSettings = settings.notifications.prayers[prayer];
+                return (
+                  <div
+                    key={prayer}
+                    className="p-4 rounded-lg bg-[var(--color-card)]"
+                  >
+                    <div
+                      className="flex items-center justify-between mb-2 cursor-pointer"
+                      onClick={() => updatePrayerNotification(prayer, { enabled: !prayerSettings.enabled })}
+                    >
+                      <span className="font-medium text-[var(--color-text)]">
+                        {PRAYER_LABELS[prayer]}
+                      </span>
+                      <div className={`
+                        relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200
+                        ${prayerSettings.enabled ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'}
+                      `}>
+                        <div className={`
+                          absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200
+                          ${prayerSettings.enabled ? 'translate-x-5' : 'translate-x-0'}
+                        `} />
+                      </div>
+                    </div>
+
+                    {prayerSettings.enabled && (
+                      <div className="flex flex-col gap-3 pt-3 border-t border-[var(--color-border)]">
+                        {/* At Prayer Time */}
+                        <div
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => updatePrayerNotification(prayer, { atPrayerTime: !prayerSettings.atPrayerTime })}
+                        >
+                          <span className="text-sm text-[var(--color-muted)]">At prayer time</span>
+                          <div className={`
+                            relative w-9 h-5 rounded-full flex-shrink-0 transition-colors duration-200
+                            ${prayerSettings.atPrayerTime ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'}
+                          `}>
+                            <div className={`
+                              absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
+                              ${prayerSettings.atPrayerTime ? 'translate-x-4' : 'translate-x-0'}
+                            `} />
+                          </div>
+                        </div>
+
+                        {/* Reminder */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-[var(--color-muted)]">Reminder before</span>
+                          <select
+                            value={prayerSettings.reminderMinutes}
+                            onChange={(e) => updatePrayerNotification(prayer, { reminderMinutes: parseInt(e.target.value) })}
+                            className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)]"
+                          >
+                            {REMINDER_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Sound */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-[var(--color-muted)] flex-shrink-0">Sound</span>
+                          <select
+                            value={prayerSettings.sound}
+                            onChange={(e) => updatePrayerNotification(prayer, { sound: e.target.value as NotificationSound })}
+                            className="px-3 py-1.5 text-sm rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)] max-w-[60%] truncate"
+                          >
+                            {BUILT_IN_SOUND_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                            {settings.athan.downloadedAthans.length > 0 && (
+                              <optgroup label="Downloaded Athans">
+                                {settings.athan.downloadedAthans.map((athan) => (
+                                  <option key={athan.id} value={`athan:${athan.id}`}>
+                                    {athan.muezzinName} — {athan.title}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Athan Settings */}
-        {category === 'athan' && (
+        {category === 'notifications-athan' && (
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-text)]">Athan Sounds</h3>
 

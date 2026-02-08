@@ -130,9 +130,7 @@ export interface SavedLocation {
 
 export interface SurahKahfSettings {
   enabled: boolean;
-  notifyAtMaghrib: boolean;       // Thursday Maghrib = Islamic Friday begins
-  fridayReminder: boolean;        // Follow-up reminder on Friday
-  fridayReminderTime: string;     // "HH:MM" format
+  repeatIntervalHours: number;    // 0 = no repeats (just Maghrib), 2/4/6 = remind every N hours until next Maghrib
 }
 
 export interface Settings {

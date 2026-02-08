@@ -368,6 +368,7 @@ const WEEKS_TO_SCHEDULE_KAHF = 4;
 
 // Schedule Surah Kahf reminders
 // Islamic day starts at Maghrib, so Thursday Maghrib = start of Islamic Friday
+// Reminders fire at Thursday Maghrib, then repeat every N hours until Friday Maghrib
 export async function scheduleSurahKahfNotifications(
   coordinates: Coordinates,
   surahKahfSettings: SurahKahfSettings,
@@ -390,43 +391,67 @@ export async function scheduleSurahKahfNotifications(
   const notifications: ScheduleOptions['notifications'] = [];
 
   for (let weekOffset = 0; weekOffset < WEEKS_TO_SCHEDULE_KAHF; weekOffset++) {
-    // Find next Thursday
-    const nextThursday = new Date(now);
-    const daysUntilThursday = (4 - now.getDay() + 7) % 7 || 7; // 4 = Thursday
-    // If today is Thursday, check if Maghrib has passed
-    if (now.getDay() === 4 && weekOffset === 0) {
-      nextThursday.setDate(now.getDate());
-    } else {
-      nextThursday.setDate(now.getDate() + daysUntilThursday + (weekOffset > 0 ? (weekOffset - (now.getDay() === 4 ? 0 : 1)) * 7 : 0));
-    }
-    // Simpler: just compute week offsets from the first upcoming Thursday
-    if (weekOffset > 0 || now.getDay() !== 4) {
-      const firstThursday = new Date(now);
-      const daysToThursday = (4 - now.getDay() + 7) % 7;
-      // If today is Thursday, daysToThursday=0, use today
-      firstThursday.setDate(now.getDate() + daysToThursday);
-      nextThursday.setTime(firstThursday.getTime());
-      nextThursday.setDate(firstThursday.getDate() + (weekOffset * 7));
+    // Find the upcoming Thursday (or today if Thursday)
+    const firstThursday = new Date(now);
+    const daysToThursday = (4 - now.getDay() + 7) % 7;
+    firstThursday.setDate(now.getDate() + daysToThursday);
+    const nextThursday = new Date(firstThursday);
+    nextThursday.setDate(firstThursday.getDate() + (weekOffset * 7));
+
+    // Get Thursday Maghrib (Islamic Friday begins)
+    const { prayers: thursdayPrayers } = calculatePrayerTimes(
+      coordinates,
+      nextThursday,
+      calculationMethod,
+      asrCalculation,
+    );
+    const thursdayMaghrib = thursdayPrayers.find(p => p.name === 'maghrib');
+    if (!thursdayMaghrib) continue;
+    const maghribTime = new Date(thursdayMaghrib.time);
+
+    // Get Friday Maghrib (Islamic Friday ends)
+    const nextFriday = new Date(nextThursday);
+    nextFriday.setDate(nextThursday.getDate() + 1);
+    const { prayers: fridayPrayers } = calculatePrayerTimes(
+      coordinates,
+      nextFriday,
+      calculationMethod,
+      asrCalculation,
+    );
+    const fridayMaghrib = fridayPrayers.find(p => p.name === 'maghrib');
+    if (!fridayMaghrib) continue;
+    const endTime = new Date(fridayMaghrib.time);
+
+    // First notification: Thursday Maghrib
+    if (maghribTime > now) {
+      notifications.push({
+        id: SURAH_KAHF_BASE_ID + (weekOffset * 10),
+        title: 'Surah Al-Kahf',
+        body: "Jumu'ah has begun! Don't forget to read Surah Al-Kahf",
+        schedule: {
+          at: maghribTime,
+          allowWhileIdle: true,
+        },
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+      });
     }
 
-    // Notification at Thursday Maghrib (Islamic Friday begins)
-    if (surahKahfSettings.notifyAtMaghrib) {
-      const { prayers } = calculatePrayerTimes(
-        coordinates,
-        nextThursday,
-        calculationMethod,
-        asrCalculation,
-      );
-      const maghrib = prayers.find(p => p.name === 'maghrib');
-      if (maghrib) {
-        const maghribTime = new Date(maghrib.time);
-        if (maghribTime > now) {
+    // Repeat reminders every N hours until Friday Maghrib
+    if (surahKahfSettings.repeatIntervalHours > 0) {
+      const intervalMs = surahKahfSettings.repeatIntervalHours * 60 * 60 * 1000;
+      let reminderTime = new Date(maghribTime.getTime() + intervalMs);
+      let reminderIndex = 1;
+
+      while (reminderTime < endTime && reminderIndex < 9) {
+        if (reminderTime > now) {
           notifications.push({
-            id: SURAH_KAHF_BASE_ID + (weekOffset * 10),
-            title: 'Surah Al-Kahf',
-            body: "Jumu'ah has begun! Don't forget to read Surah Al-Kahf",
+            id: SURAH_KAHF_BASE_ID + (weekOffset * 10) + reminderIndex,
+            title: 'Surah Al-Kahf Reminder',
+            body: 'Have you read Surah Al-Kahf today?',
             schedule: {
-              at: maghribTime,
+              at: reminderTime,
               allowWhileIdle: true,
             },
             sound: 'default',
@@ -434,29 +459,8 @@ export async function scheduleSurahKahfNotifications(
             largeIcon: 'ic_launcher',
           });
         }
-      }
-    }
-
-    // Friday morning follow-up reminder
-    if (surahKahfSettings.fridayReminder) {
-      const nextFriday = new Date(nextThursday);
-      nextFriday.setDate(nextThursday.getDate() + 1);
-      const [hour, minute] = surahKahfSettings.fridayReminderTime.split(':').map(Number);
-      nextFriday.setHours(hour, minute, 0, 0);
-
-      if (nextFriday > now) {
-        notifications.push({
-          id: SURAH_KAHF_BASE_ID + (weekOffset * 10) + 1,
-          title: 'Surah Al-Kahf Reminder',
-          body: 'Have you read Surah Al-Kahf today?',
-          schedule: {
-            at: nextFriday,
-            allowWhileIdle: true,
-          },
-          sound: 'default',
-          smallIcon: 'ic_stat_icon',
-          largeIcon: 'ic_launcher',
-        });
+        reminderTime = new Date(reminderTime.getTime() + intervalMs);
+        reminderIndex++;
       }
     }
   }
