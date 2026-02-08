@@ -629,11 +629,15 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                   active={theme === 'system'}
                   onClick={() => setTheme('system')}
                   label="System"
+                  swatches={['#F5F6F8', '#0A0C10', '#4361EE', '#6B8AFF']}
+                  colors={{ bg: '#16181D', text: '#F5F6F8', border: '#2A2E38', primary: '#6B8AFF' }}
                 />
                 <ThemeOption
                   active={theme === 'auto'}
                   onClick={() => setTheme('auto')}
                   label="Auto"
+                  swatches={['#FFFFFF', '#16181D', '#4361EE', '#6B8AFF']}
+                  colors={{ bg: '#16181D', text: '#F5F6F8', border: '#2A2E38', primary: '#6B8AFF' }}
                 />
               </div>
               {theme === 'auto' && (
