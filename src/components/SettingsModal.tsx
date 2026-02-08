@@ -629,14 +629,14 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                   active={theme === 'system'}
                   onClick={() => setTheme('system')}
                   label="System"
-                  swatches={['#F5F6F8', '#0A0C10', '#4361EE', '#6B8AFF']}
+                  description="Match your device"
                   colors={{ bg: '#16181D', text: '#F5F6F8', border: '#2A2E38', primary: '#6B8AFF' }}
                 />
                 <ThemeOption
                   active={theme === 'auto'}
                   onClick={() => setTheme('auto')}
                   label="Auto"
-                  swatches={['#FFFFFF', '#16181D', '#4361EE', '#6B8AFF']}
+                  description="Follows prayer times"
                   colors={{ bg: '#16181D', text: '#F5F6F8', border: '#2A2E38', primary: '#6B8AFF' }}
                 />
               </div>
@@ -1488,30 +1488,26 @@ function ThemeOption({
   onClick,
   label,
   swatches,
+  description,
   colors,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   swatches?: string[];
-  colors?: { bg: string; text: string; border: string; primary: string };
+  description?: string;
+  colors: { bg: string; text: string; border: string; primary: string };
 }) {
   return (
     <button
       onClick={onClick}
-      style={colors ? {
+      style={{
         backgroundColor: colors.bg,
         color: colors.text,
         borderColor: active ? colors.primary : colors.border,
         borderWidth: active ? '2px' : '1px',
-      } : undefined}
-      className={`
-        p-3 rounded-lg flex flex-col items-center gap-2 transition-all border
-        ${!colors ? (active
-          ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-          : 'bg-[var(--color-card)] text-[var(--color-text)] border-[var(--color-border)] hover:bg-[var(--color-border)]'
-        ) : ''}
-      `}
+      }}
+      className="p-3 rounded-lg flex flex-col items-center gap-1 transition-all border"
     >
       {swatches ? (
         <div className="flex gap-1">
@@ -1523,7 +1519,9 @@ function ThemeOption({
             />
           ))}
         </div>
-      ) : null}
+      ) : (
+        <span className="text-[11px] opacity-60 leading-tight">{description}</span>
+      )}
       <span className="font-medium text-sm">{label}</span>
     </button>
   );
