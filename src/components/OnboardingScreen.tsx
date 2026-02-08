@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Geolocation } from '@capacitor/geolocation';
 import { useLocation } from '../context/LocationContext';
+import { useSettings } from '../context/SettingsContext';
+import { useTravel } from '../context/TravelContext';
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -13,6 +15,8 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const { refreshLocation } = useLocation();
+  const { addPreviousLocation } = useSettings();
+  const { setHomeBase } = useTravel();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup timer on unmount
@@ -57,8 +61,21 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         }
       }
       setLocationStatus('Finding your location...');
-      await refreshLocation();
+      const loc = await refreshLocation();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (loc) {
+        addPreviousLocation({
+          coordinates: loc.coordinates,
+          cityName: loc.cityName,
+          countryCode: loc.countryCode,
+          savedAt: new Date().toISOString(),
+        });
+        setHomeBase({
+          coordinates: loc.coordinates,
+          cityName: loc.cityName,
+          countryCode: loc.countryCode,
+        });
+      }
       setLocationStatus('Location found!');
       setTimeout(onComplete, 600);
     } catch {

@@ -46,6 +46,7 @@ export const defaultTravelSettings: TravelSettings = {
   jamaMaghribIsha: false,
   maxTravelDays: 0,
   travelStartDate: null,
+  autoConfirmed: false,
 };
 
 const defaultSettings: Settings = {
@@ -75,6 +76,7 @@ const defaultSettings: Settings = {
   athan: defaultAthanSettings,
   surahKahf: defaultSurahKahfSettings,
   previousLocations: [],
+  distanceUnit: 'miles',
 };
 
 interface SettingsContextType {
@@ -91,6 +93,7 @@ interface SettingsContextType {
   updateSurahKahf: (updates: Partial<SurahKahfSettings>) => void;
   updateDisplay: (updates: Partial<DisplaySettings>) => void;
   updateAthan: (updates: Partial<AthanSettings>) => void;
+  updateDistanceUnit: (unit: 'miles' | 'km') => void;
   addPreviousLocation: (loc: SavedLocation) => void;
   removePreviousLocation: (index: number) => void;
   isLoading: boolean;
@@ -176,6 +179,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             repeatIntervalHours: parsed.surahKahf?.repeatIntervalHours ?? defaultSurahKahfSettings.repeatIntervalHours,
           },
           previousLocations: parsed.previousLocations || [],
+          distanceUnit: parsed.distanceUnit || 'miles',
         });
       }
     } catch (error) {
@@ -298,6 +302,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }));
   }
 
+  function updateDistanceUnit(unit: 'miles' | 'km') {
+    setSettings((prev) => ({ ...prev, distanceUnit: unit }));
+  }
+
   function addPreviousLocation(loc: SavedLocation) {
     setSettings((prev) => {
       // Don't add duplicates (same city name and close coordinates)
@@ -336,6 +344,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateSurahKahf,
         updateDisplay,
         updateAthan,
+        updateDistanceUnit,
         addPreviousLocation,
         removePreviousLocation,
         isLoading,

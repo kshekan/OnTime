@@ -14,6 +14,7 @@ import {
   stopAthanPreview,
 } from '../services/athanService';
 import { AthanPlugin } from '../plugins/athanPlugin';
+import { formatDistance } from '../utils/distance';
 import type { CalculationMethod, PrayerName, NotificationSound, CityEntry, AthanCatalogEntry, AthanFile } from '../types';
 
 type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'notifications' | 'notifications-prayers' | 'notifications-athan' | 'notifications-jumuah' | 'notifications-kahf' | 'travel' | 'about' | 'travel-home-search' | 'athan-catalog';
@@ -62,6 +63,7 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
     updateSurahKahf,
     updateDisplay,
     updateAthan,
+    updateDistanceUnit,
     addPreviousLocation,
     removePreviousLocation,
   } = useSettings();
@@ -317,7 +319,7 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
               <p className="text-xs text-[var(--color-muted)] leading-relaxed">
-                Setting a home location enables travel mode. When you're more than {Math.round(settings.travel.distanceThresholdKm * 0.621)} miles from home, prayers are automatically shortened (Qasr) per Islamic travel rulings.
+                Setting a home location enables travel mode. When you're more than {formatDistance(settings.travel.distanceThresholdKm, settings.distanceUnit)} from home, prayers are automatically shortened (Qasr) per Islamic travel rulings.
               </p>
             </div>
 
@@ -467,6 +469,22 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                               </svg>
                             </button>
                           )}
+                          {/* See on map */}
+                          <button
+                            onClick={() => {
+                              const label = encodeURIComponent(loc.cityName);
+                              window.open(
+                                `geo:${loc.coordinates.latitude},${loc.coordinates.longitude}?q=${loc.coordinates.latitude},${loc.coordinates.longitude}(${label})`,
+                                '_system'
+                              );
+                            }}
+                            className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
+                            title="See on map"
+                          >
+                            <svg className="w-4 h-4 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+                            </svg>
+                          </button>
                           {/* Set as home */}
                           {!isHome && (
                             <button
@@ -1233,6 +1251,25 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                   </div>
                 </div>
 
+                {/* Distance Unit */}
+                <div className="p-4 rounded-lg bg-[var(--color-card)]">
+                  <p className="text-sm text-[var(--color-muted)] mb-2">Distance Unit</p>
+                  <div className="flex gap-2">
+                    <ToggleButton
+                      active={settings.distanceUnit === 'miles'}
+                      onClick={() => updateDistanceUnit('miles')}
+                    >
+                      Miles
+                    </ToggleButton>
+                    <ToggleButton
+                      active={settings.distanceUnit === 'km'}
+                      onClick={() => updateDistanceUnit('km')}
+                    >
+                      Kilometers
+                    </ToggleButton>
+                  </div>
+                </div>
+
                 {/* Home Base */}
                 <div className="p-4 rounded-lg bg-[var(--color-card)]">
                   <div className="flex items-center justify-between mb-3">
@@ -1378,7 +1415,7 @@ export function SettingsModal({ isOpen, onClose, onBackRef }: SettingsModalProps
                     <p className="text-amber-600 font-medium text-sm">Currently Traveling</p>
                     {travelState.distanceFromHomeKm !== null && (
                       <p className="text-amber-600/70 text-xs mt-1">
-                        {Math.round(travelState.distanceFromHomeKm)} km from home
+                        {formatDistance(travelState.distanceFromHomeKm, settings.distanceUnit)} from home
                         {travelState.isAutoDetected && ' (auto-detected)'}
                       </p>
                     )}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { useSettings } from './SettingsContext';
 import { useLocation } from './LocationContext';
 import { calculateDistanceKm } from '../utils/distance';
@@ -11,10 +11,13 @@ interface TravelContextType {
   setTravelOverride: (override: TravelSettings['override']) => void;
   toggleJama: (pair: 'dhuhrAsr' | 'maghribIsha') => void;
   toggleTravelEnabled: () => void;
+  confirmTravel: () => void;
+  dismissTravel: () => void;
 }
 
 const defaultTravelState: TravelState = {
   isTraveling: false,
+  travelPending: false,
   distanceFromHomeKm: null,
   isAutoDetected: false,
   qasr: { dhuhr: false, asr: false, isha: false },
@@ -27,6 +30,10 @@ const TravelContext = createContext<TravelContextType | null>(null);
 export function TravelProvider({ children }: { children: ReactNode }) {
   const { settings, updateTravel } = useSettings();
   const { location } = useLocation();
+  const [dismissed, setDismissed] = useState(false);
+
+  // Track previous distance to auto-reset autoConfirmed when returning home
+  const prevDistanceRef = useRef<number | null>(null);
 
   const travelState = useMemo<TravelState>(() => {
     const { travel } = settings;
@@ -47,13 +54,21 @@ export function TravelProvider({ children }: { children: ReactNode }) {
 
     let isTraveling = false;
     let isAutoDetected = false;
+    let travelPending = false;
 
     if (travel.override === 'force_on') {
       isTraveling = true;
     } else {
-      // Auto detection
-      isTraveling = distance >= travel.distanceThresholdKm;
-      isAutoDetected = isTraveling;
+      // Auto detection with confirmation
+      const aboveThreshold = distance >= travel.distanceThresholdKm;
+      if (aboveThreshold && travel.autoConfirmed) {
+        isTraveling = true;
+        isAutoDetected = true;
+      } else if (aboveThreshold && !travel.autoConfirmed) {
+        travelPending = !dismissed;
+        isTraveling = false;
+        isAutoDetected = false;
+      }
     }
 
     // Check max travel days expiration
@@ -66,29 +81,63 @@ export function TravelProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    if (!isTraveling) {
+    if (!isTraveling && !travelPending) {
       return {
         ...defaultTravelState,
         distanceFromHomeKm: distance,
       };
     }
 
+    if (travelPending) {
+      return {
+        ...defaultTravelState,
+        travelPending: true,
+        distanceFromHomeKm: distance,
+      };
+    }
+
     return {
       isTraveling: true,
+      travelPending: false,
       distanceFromHomeKm: distance,
       isAutoDetected,
       qasr: { dhuhr: true, asr: true, isha: true },
       jamaDhuhrAsr: travel.jamaDhuhrAsr,
       jamaMaghribIsha: travel.jamaMaghribIsha,
     };
-  }, [settings, location]);
+  }, [settings, location, dismissed]);
+
+  // Auto-reset autoConfirmed when user returns home (distance drops below threshold)
+  useEffect(() => {
+    const { travel } = settings;
+    if (!travel.enabled || !travel.homeBase) return;
+
+    const distance = calculateDistanceKm(
+      travel.homeBase.coordinates,
+      location.coordinates,
+    );
+
+    const prevDistance = prevDistanceRef.current;
+    prevDistanceRef.current = distance;
+
+    // If previously above threshold and now below, reset
+    if (
+      travel.autoConfirmed &&
+      prevDistance !== null &&
+      prevDistance >= travel.distanceThresholdKm &&
+      distance < travel.distanceThresholdKm
+    ) {
+      updateTravel({ autoConfirmed: false, travelStartDate: null });
+      setDismissed(false);
+    }
+  }, [settings, location, updateTravel]);
 
   function setHomeBase(home: HomeBaseLocation) {
     updateTravel({ homeBase: home });
   }
 
   function clearHomeBase() {
-    updateTravel({ homeBase: null, travelStartDate: null });
+    updateTravel({ homeBase: null, travelStartDate: null, autoConfirmed: false });
   }
 
   function setTravelOverride(override: TravelSettings['override']) {
@@ -117,6 +166,18 @@ export function TravelProvider({ children }: { children: ReactNode }) {
     updateTravel(updates);
   }
 
+  function confirmTravel() {
+    updateTravel({
+      autoConfirmed: true,
+      travelStartDate: new Date().toISOString().split('T')[0],
+    });
+    setDismissed(false);
+  }
+
+  function dismissTravel() {
+    setDismissed(true);
+  }
+
   return (
     <TravelContext.Provider
       value={{
@@ -126,6 +187,8 @@ export function TravelProvider({ children }: { children: ReactNode }) {
         setTravelOverride,
         toggleJama,
         toggleTravelEnabled,
+        confirmTravel,
+        dismissTravel,
       }}
     >
       {children}

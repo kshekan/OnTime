@@ -104,10 +104,12 @@ export interface TravelSettings {
   jamaMaghribIsha: boolean;           // combine Maghrib+Isha
   maxTravelDays: number;              // 4, 10, 15, or 0=unlimited
   travelStartDate: string | null;     // ISO date
+  autoConfirmed: boolean;             // user confirmed current auto-detected trip
 }
 
 export interface TravelState {
   isTraveling: boolean;
+  travelPending: boolean;
   distanceFromHomeKm: number | null;
   isAutoDetected: boolean;
   qasr: { dhuhr: boolean; asr: boolean; isha: boolean };
@@ -144,6 +146,7 @@ export interface Settings {
   athan: AthanSettings;
   surahKahf: SurahKahfSettings;
   previousLocations: SavedLocation[];
+  distanceUnit: 'miles' | 'km';
 }
 
 export interface CityEntry {

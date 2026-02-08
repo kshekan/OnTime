@@ -21,3 +21,14 @@ export function calculateDistanceKm(from: Coordinates, to: Coordinates): number 
 
   return EARTH_RADIUS_KM * c;
 }
+
+export function kmToMiles(km: number): number {
+  return km * 0.621371;
+}
+
+export function formatDistance(km: number, unit: 'miles' | 'km'): string {
+  if (unit === 'miles') {
+    return `${Math.round(kmToMiles(km))} mi`;
+  }
+  return `${Math.round(km)} km`;
+}

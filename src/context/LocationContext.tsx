@@ -16,7 +16,7 @@ interface LocationContextType {
   location: LocationData;
   isLoading: boolean;
   error: string | null;
-  refreshLocation: () => Promise<void>;
+  refreshLocation: () => Promise<LocationData | undefined>;
   setManualLocation: (coords: Coordinates, cityName: string, countryCode?: string) => void;
   getGPSLocation: () => Promise<LocationData>;
 }
@@ -64,19 +64,19 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function refreshLocation() {
+  async function refreshLocation(): Promise<LocationData | undefined> {
     setError(null);
-    
+
     try {
       // Check permissions first
       const permStatus = await Geolocation.checkPermissions();
-      
+
       if (permStatus.location === 'denied') {
         // Request permission
         const requestResult = await Geolocation.requestPermissions();
         if (requestResult.location === 'denied') {
           setError('Location permission denied');
-          return;
+          return undefined;
         }
       }
 
@@ -91,23 +91,26 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       };
 
       // Reverse geocode to get city name
-      const cityName = await reverseGeocode(coords);
+      const { displayName, countryCode } = await reverseGeocode(coords);
 
       const newLocation: LocationData = {
         coordinates: coords,
-        cityName,
+        cityName: displayName,
+        countryCode,
       };
 
       setLocation(newLocation);
       await saveLocation(newLocation);
+      return newLocation;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get location';
       setError(message);
       console.error('Location error:', err);
+      return undefined;
     }
   }
 
-  async function reverseGeocode(coords: Coordinates): Promise<string> {
+  async function reverseGeocode(coords: Coordinates): Promise<{ displayName: string; countryCode?: string }> {
     try {
       // Using free Nominatim API for reverse geocoding
       const response = await fetch(
@@ -121,18 +124,33 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        const city = data.address?.city || 
-                     data.address?.town || 
-                     data.address?.village || 
-                     data.address?.county ||
-                     'Unknown Location';
-        return city;
+        const addr = data.address || {};
+        const city = addr.city || addr.town || addr.village || addr.county || '';
+        const suburb = addr.suburb || addr.neighbourhood || '';
+        const road = addr.road || '';
+        const state = addr.state || '';
+        const countryCode = addr.country_code ? addr.country_code.toUpperCase() : undefined;
+
+        let displayName: string;
+        if (suburb && city) {
+          displayName = `${suburb}, ${city}`;
+        } else if (road && city) {
+          displayName = `${road}, ${city}`;
+        } else if (city && state) {
+          displayName = `${city}, ${state}`;
+        } else if (city) {
+          displayName = city;
+        } else {
+          displayName = 'Unknown Location';
+        }
+
+        return { displayName, countryCode };
       }
     } catch (err) {
       console.error('Reverse geocoding failed:', err);
     }
-    
-    return 'Current Location';
+
+    return { displayName: 'Current Location' };
   }
 
   function setManualLocation(coords: Coordinates, cityName: string, countryCode?: string) {
@@ -162,9 +180,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       longitude: position.coords.longitude,
     };
 
-    const cityName = await reverseGeocode(coords);
+    const { displayName, countryCode } = await reverseGeocode(coords);
 
-    return { coordinates: coords, cityName };
+    return { coordinates: coords, cityName: displayName, countryCode };
   }
 
   return (

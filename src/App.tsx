@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { usePrayerTimes } from './hooks/usePrayerTimes';
 import { useNotifications } from './hooks/useNotifications';
 import { useTheme } from './context/ThemeContext';
 import { useTravel } from './context/TravelContext';
 import { useSettings } from './context/SettingsContext';
+import { formatDistance } from './utils/distance';
 import { PrayerTable } from './components/PrayerTable';
 import { CountdownTimer } from './components/CountdownTimer';
 import { LocationDisplay } from './components/LocationDisplay';
@@ -14,6 +16,7 @@ import { QiblaCompass } from './components/QiblaCompass';
 import { SettingsModal } from './components/SettingsModal';
 import { Dashboard } from './components/Dashboard';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { TravelPromptDialog } from './components/TravelPromptDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faKaaba } from '@fortawesome/free-solid-svg-icons';
 
@@ -74,6 +77,25 @@ function App() {
     const maghrib = prayers.find(p => p.name === 'maghrib')?.time || null;
     updatePrayerTimes(fajr, maghrib);
   }, [prayers, updatePrayerTimes]);
+
+  // Fire notification when travel is detected and pending confirmation
+  const prevTravelPendingRef = useRef(false);
+  useEffect(() => {
+    const wasPending = prevTravelPendingRef.current;
+    prevTravelPendingRef.current = travelState.travelPending;
+
+    if (travelState.travelPending && !wasPending && travelState.distanceFromHomeKm !== null) {
+      const distanceText = formatDistance(travelState.distanceFromHomeKm, settings.distanceUnit);
+      LocalNotifications.schedule({
+        notifications: [{
+          id: 900,
+          title: 'Are you traveling?',
+          body: `You're about ${distanceText} from home \u2014 tap to enable shortened prayers.`,
+          schedule: { at: new Date(Date.now() + 500) },
+        }],
+      }).catch(() => {});
+    }
+  }, [travelState.travelPending, travelState.distanceFromHomeKm, settings.distanceUnit]);
 
   // Show nothing while checking onboarding status
   if (showOnboarding === null) return null;
@@ -159,7 +181,7 @@ function App() {
                 <span className="text-amber-600 text-sm font-semibold">Travel Mode</span>
                 {travelState.distanceFromHomeKm !== null && (
                   <span className="text-amber-600/70 text-xs">
-                    {Math.round(travelState.distanceFromHomeKm)} km from home
+                    {formatDistance(travelState.distanceFromHomeKm, settings.distanceUnit)} from home
                   </span>
                 )}
               </div>
@@ -169,6 +191,7 @@ function App() {
           <PrayerTable
             prayers={prayers}
             currentPrayer={currentPrayer}
+            nextPrayerTime={nextPrayerTime}
           />
         </div>
 
@@ -179,6 +202,7 @@ function App() {
       <QiblaCompass isOpen={isQiblaOpen} onClose={() => setIsQiblaOpen(false)} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onBackRef={settingsBackRef} />
       <Dashboard isOpen={isDashboardOpen} onClose={() => setIsDashboardOpen(false)} />
+      <TravelPromptDialog />
     </div>
   );
 }
