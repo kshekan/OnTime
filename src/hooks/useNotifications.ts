@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { scheduleNotifications, scheduleJumuahNotifications, setupNotificationListeners } from '../services/notificationService';
+import { scheduleNotifications, scheduleJumuahNotifications, scheduleSurahKahfNotifications, setupNotificationListeners } from '../services/notificationService';
 import { useSettings } from '../context/SettingsContext';
 import { useLocation } from '../context/LocationContext';
 
@@ -17,6 +17,16 @@ export function useNotifications() {
     await scheduleJumuahNotifications(settings.jumuah);
   }, [settings.jumuah]);
 
+  // Schedule Surah Kahf notifications when location or settings change
+  const rescheduleSurahKahf = useCallback(async () => {
+    await scheduleSurahKahfNotifications(
+      location.coordinates,
+      settings.surahKahf,
+      settings.calculationMethod,
+      settings.asrCalculation,
+    );
+  }, [location.coordinates, settings.surahKahf, settings.calculationMethod, settings.asrCalculation]);
+
   useEffect(() => {
     reschedule();
   }, [reschedule]);
@@ -24,6 +34,10 @@ export function useNotifications() {
   useEffect(() => {
     rescheduleJumuah();
   }, [rescheduleJumuah]);
+
+  useEffect(() => {
+    rescheduleSurahKahf();
+  }, [rescheduleSurahKahf]);
 
   // Set up notification click listener
   useEffect(() => {
@@ -34,5 +48,5 @@ export function useNotifications() {
     return cleanup;
   }, []);
 
-  return { reschedule, rescheduleJumuah };
+  return { reschedule, rescheduleJumuah, rescheduleSurahKahf };
 }

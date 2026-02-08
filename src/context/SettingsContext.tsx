@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Preferences } from '@capacitor/preferences';
-import type { Settings, CalculationMethod, AsrCalculation, PrayerName, OptionalPrayersSettings, PrayerNotificationSettings, NotificationSound, JumuahSettings, TravelSettings, DisplaySettings, AthanSettings, SavedLocation } from '../types';
+import type { Settings, CalculationMethod, AsrCalculation, PrayerName, OptionalPrayersSettings, PrayerNotificationSettings, NotificationSound, JumuahSettings, SurahKahfSettings, TravelSettings, DisplaySettings, AthanSettings, SavedLocation } from '../types';
 
 const SETTINGS_KEY = 'ontime_settings';
 
@@ -30,6 +30,13 @@ export const defaultAthanSettings: AthanSettings = {
   selectedFajrAthanId: null,
   currentChannelId: null,
   currentFajrChannelId: null,
+};
+
+export const defaultSurahKahfSettings: SurahKahfSettings = {
+  enabled: false,
+  notifyAtMaghrib: true,
+  fridayReminder: true,
+  fridayReminderTime: '09:00',
 };
 
 export const defaultTravelSettings: TravelSettings = {
@@ -68,6 +75,7 @@ const defaultSettings: Settings = {
   travel: defaultTravelSettings,
   display: defaultDisplaySettings,
   athan: defaultAthanSettings,
+  surahKahf: defaultSurahKahfSettings,
   previousLocations: [],
 };
 
@@ -82,6 +90,7 @@ interface SettingsContextType {
   updatePrayerNotification: (prayer: PrayerName, updates: Partial<PrayerNotificationSettings>) => void;
   updateJumuah: (updates: Partial<JumuahSettings>) => void;
   updateTravel: (updates: Partial<TravelSettings>) => void;
+  updateSurahKahf: (updates: Partial<SurahKahfSettings>) => void;
   updateDisplay: (updates: Partial<DisplaySettings>) => void;
   updateAthan: (updates: Partial<AthanSettings>) => void;
   addPreviousLocation: (loc: SavedLocation) => void;
@@ -162,6 +171,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           athan: {
             ...defaultAthanSettings,
             ...parsed.athan,
+          },
+          surahKahf: {
+            ...defaultSurahKahfSettings,
+            ...parsed.surahKahf,
           },
           previousLocations: parsed.previousLocations || [],
         });
@@ -256,6 +269,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }));
   }
 
+  function updateSurahKahf(updates: Partial<SurahKahfSettings>) {
+    setSettings((prev) => ({
+      ...prev,
+      surahKahf: {
+        ...prev.surahKahf,
+        ...updates,
+      },
+    }));
+  }
+
   function updateDisplay(updates: Partial<DisplaySettings>) {
     setSettings((prev) => ({
       ...prev,
@@ -311,6 +334,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updatePrayerNotification,
         updateJumuah,
         updateTravel,
+        updateSurahKahf,
         updateDisplay,
         updateAthan,
         addPreviousLocation,

@@ -128,6 +128,13 @@ export interface SavedLocation {
   savedAt: string; // ISO date
 }
 
+export interface SurahKahfSettings {
+  enabled: boolean;
+  notifyAtMaghrib: boolean;       // Thursday Maghrib = Islamic Friday begins
+  fridayReminder: boolean;        // Follow-up reminder on Friday
+  fridayReminderTime: string;     // "HH:MM" format
+}
+
 export interface Settings {
   calculationMethod: CalculationMethod;
   asrCalculation: AsrCalculation;
@@ -137,6 +144,7 @@ export interface Settings {
   travel: TravelSettings;
   display: DisplaySettings;
   athan: AthanSettings;
+  surahKahf: SurahKahfSettings;
   previousLocations: SavedLocation[];
 }
 

@@ -16,7 +16,7 @@ import {
 import { AthanPlugin } from '../plugins/athanPlugin';
 import type { CalculationMethod, PrayerName, NotificationSound, CityEntry, AthanCatalogEntry, AthanFile } from '../types';
 
-type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'jumuah' | 'notifications' | 'travel' | 'about' | 'travel-home-search' | 'athan' | 'athan-catalog';
+type SettingsCategory = 'main' | 'location' | 'calculation' | 'appearance' | 'jumuah' | 'notifications' | 'travel' | 'about' | 'travel-home-search' | 'athan' | 'athan-catalog' | 'surah-kahf';
 
 const PRAYER_LABELS: Record<PrayerName, string> = {
   fajr: 'Fajr',
@@ -58,6 +58,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     updateNotifications,
     updatePrayerNotification,
     updateJumuah,
+    updateSurahKahf,
     updateDisplay,
     updateAthan,
     addPreviousLocation,
@@ -167,6 +168,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (selected) return selected.muezzinName;
     return 'Default';
   };
+  const getSurahKahfSummary = () => {
+    if (!settings.surahKahf.enabled) return 'Off';
+    return 'Enabled';
+  };
   const getTravelSummary = () => {
     if (!settings.travel.enabled) return 'Off';
     if (travelState.isTraveling) return 'Traveling';
@@ -232,6 +237,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               title="Jumu'ah"
               summary={getJumuahSummary()}
               onClick={() => setCategory('jumuah')}
+            />
+            <CategoryItem
+              icon={<BookIcon />}
+              title="Surah Al-Kahf"
+              summary={getSurahKahfSummary()}
+              onClick={() => setCategory('surah-kahf')}
             />
             <CategoryItem
               icon={<NotificationIcon />}
@@ -741,6 +752,64 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </select>
                   </div>
                 </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Surah Kahf Settings */}
+        {category === 'surah-kahf' && (
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-[var(--color-text)]">Surah Al-Kahf Reminder</h3>
+
+            <div className="flex items-start gap-2.5 px-1">
+              <svg className="w-4 h-4 text-[var(--color-primary)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                In the Islamic calendar, the day begins at Maghrib. So Friday starts at Thursday's Maghrib time. Reading Surah Al-Kahf on Friday is a recommended Sunnah.
+              </p>
+            </div>
+
+            <ToggleRow
+              label="Enable Surah Al-Kahf Reminder"
+              description="Get reminded to read Surah Al-Kahf every week"
+              checked={settings.surahKahf.enabled}
+              onChange={(checked) => updateSurahKahf({ enabled: checked })}
+            />
+
+            {settings.surahKahf.enabled && (
+              <>
+                <ToggleRow
+                  label="Notify at Thursday Maghrib"
+                  description="When Islamic Friday begins"
+                  checked={settings.surahKahf.notifyAtMaghrib}
+                  onChange={(checked) => updateSurahKahf({ notifyAtMaghrib: checked })}
+                />
+
+                <ToggleRow
+                  label="Friday Morning Reminder"
+                  description="Follow-up reminder on Friday"
+                  checked={settings.surahKahf.fridayReminder}
+                  onChange={(checked) => updateSurahKahf({ fridayReminder: checked })}
+                />
+
+                {settings.surahKahf.fridayReminder && (
+                  <div className="p-4 rounded-lg bg-[var(--color-card)]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[var(--color-text)] font-medium">Reminder Time</p>
+                        <p className="text-sm text-[var(--color-muted)]">When to remind on Friday</p>
+                      </div>
+                      <input
+                        type="time"
+                        value={settings.surahKahf.fridayReminderTime}
+                        onChange={(e) => updateSurahKahf({ fridayReminderTime: e.target.value })}
+                        className="px-3 py-2 rounded-lg bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)]"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1499,6 +1568,14 @@ function MosqueIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c-1.5 2-3 3.5-3 5.5a3 3 0 106 0c0-2-1.5-3.5-3-5.5zM4 21v-6a8 8 0 0116 0v6M8 21v-4M16 21v-4" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
     </svg>
   );
 }
