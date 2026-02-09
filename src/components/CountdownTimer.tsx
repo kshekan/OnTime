@@ -99,7 +99,7 @@ export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hour
     <div className="space-y-3">
       {/* Current Prayer Card */}
       {display.showCurrentPrayer && currentPrayer && currentPrayer !== 'sunrise' && (
-        <div className="bg-[var(--color-card)] rounded-lg p-3 border border-[var(--color-border)]">
+        <div className="bg-[var(--color-card)] rounded-lg p-3 border border-red-500/50 current-prayer-glow relative z-[45]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-[var(--color-muted)] uppercase tracking-wide mb-0.5">
@@ -207,6 +207,16 @@ export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hour
           </p>
         </div>
       )}
+
+      <style>{`
+        @keyframes prayer-glow {
+          0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.15), 0 0 20px rgba(239, 68, 68, 0.08); }
+          50% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.3), 0 0 32px rgba(239, 68, 68, 0.12); }
+        }
+        .current-prayer-glow {
+          animation: prayer-glow 3s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

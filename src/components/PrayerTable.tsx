@@ -8,6 +8,7 @@ import type { PrayerTime, PrayerName, AllPrayerNames, TravelState } from '../typ
 interface PrayerTableProps {
   prayers: PrayerTime[];
   currentPrayer: PrayerName | null;
+  nextPrayerTime: Date | null;
 }
 
 // Core 5 prayers (always shown)
@@ -184,6 +185,7 @@ export function PrayerTable({ prayers, currentPrayer }: PrayerTableProps) {
             key={prayer.name}
             prayer={jumuahPrayer}
             isHighlighted={prayer.name === highlightedPrayer}
+
             isSelected={prayer.name === selectedPrayer}
             trackingStatus={trackingStatus[prayer.name] || 'untracked'}
             onTap={() => handleRowTap(prayer.name)}
@@ -374,7 +376,7 @@ interface PrayerRowProps {
 function PrayerRow({ prayer, isHighlighted, isSelected, trackingStatus, onTap, onTrack, travelState, sunnahPrayers }: PrayerRowProps) {
   const [countdown, setCountdown] = useState<string>('');
   const [showTrackingPrompt, setShowTrackingPrompt] = useState(false);
-  
+
   const formattedTime = formatTime(prayer.time);
   const timeParts = formattedTime.match(/(\d+:\d+)\s*(AM|PM)/i);
   const time = timeParts ? timeParts[1] : formattedTime;
@@ -480,7 +482,7 @@ function PrayerRow({ prayer, isHighlighted, isSelected, trackingStatus, onTap, o
     >
       {/* Subtle shine overlay for highlighted row */}
       {isHighlighted && (
-        <div 
+        <div
           className="absolute inset-0 rounded-lg opacity-20 pointer-events-none"
           style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(255,255,255,0.1) 100%)',

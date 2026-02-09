@@ -114,7 +114,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] safe-area-bottom flex flex-col">
-      <div className="max-w-lg mx-auto w-full flex flex-col flex-1">
+      <div className="max-w-lg mx-auto w-full flex-1 overflow-y-auto">
 {/* Top Bar - sticky below status bar */}
         <header className="sticky top-0 z-40 safe-area-top bg-[var(--color-background)] px-4 pt-2 pb-3 flex items-center justify-between">
           <button
@@ -153,8 +153,8 @@ function App() {
           </div>
         </header>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6">
+        {/* Content */}
+        <div className="px-4 pb-6">
 
         {/* Current Prayer & Countdown */}
         {(currentPrayer || nextPrayer) && (
