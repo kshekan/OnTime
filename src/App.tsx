@@ -161,6 +161,7 @@ function App() {
           <div className="mb-5">
             <CountdownTimer
               currentPrayer={currentPrayer}
+              currentPrayerTime={currentPrayer ? prayers.find(p => p.name === currentPrayer)?.time ?? null : null}
               nextPrayer={nextPrayer}
               nextPrayerTime={nextPrayerTime}
               hours={countdown.hours}

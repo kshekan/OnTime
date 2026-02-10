@@ -3,6 +3,7 @@ import type { PrayerName, TravelState, DisplaySettings } from '../types';
 
 interface CountdownTimerProps {
   currentPrayer: PrayerName | null;
+  currentPrayerTime: Date | null;
   nextPrayer: string | null;
   nextPrayerTime: Date | null;
   hours: number;
@@ -33,7 +34,7 @@ const SUNNAH_PRAYERS_TRAVEL: Record<PrayerName, { before?: string; after?: strin
   isha: { after: 'Witr' },
 };
 
-export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hours, minutes, seconds, isTraveling = false, travelState, display }: CountdownTimerProps) {
+export function CountdownTimer({ currentPrayer, currentPrayerTime, nextPrayer, nextPrayerTime, hours, minutes, seconds, isTraveling = false, travelState, display }: CountdownTimerProps) {
   const formatNumber = (n: number) => n.toString().padStart(2, '0');
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -50,25 +51,38 @@ export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hour
     }
   }
 
-  // Current prayer countdown (time until current prayer window ends = next prayer time)
-  const [currentCountdown, setCurrentCountdown] = useState({ h: 0, m: 0, s: 0 });
+  // Elapsed time since current prayer started + progress through prayer window
+  const [elapsed, setElapsed] = useState({ h: 0, m: 0, s: 0 });
+  const [progress, setProgress] = useState(0); // 0 to 1 representing how far through the prayer window
   useEffect(() => {
-    if (!currentPrayer || !nextPrayerTime || !display.showCurrentPrayer) return;
+    if (!currentPrayer || !currentPrayerTime || !display.showCurrentPrayer) return;
 
     const update = () => {
       const now = new Date();
-      const diff = Math.max(0, Math.floor((nextPrayerTime.getTime() - now.getTime()) / 1000));
-      setCurrentCountdown({
+      const diff = Math.max(0, Math.floor((now.getTime() - currentPrayerTime.getTime()) / 1000));
+      setElapsed({
         h: Math.floor(diff / 3600),
         m: Math.floor((diff % 3600) / 60),
         s: diff % 60,
       });
+
+      // Compute progress through prayer window (0 at start, 1 at end)
+      if (nextPrayerTime) {
+        const totalDuration = nextPrayerTime.getTime() - currentPrayerTime.getTime();
+        const elapsedDuration = now.getTime() - currentPrayerTime.getTime();
+        setProgress(totalDuration > 0 ? Math.min(1, Math.max(0, elapsedDuration / totalDuration)) : 0);
+      }
     };
 
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [currentPrayer, nextPrayerTime, display.showCurrentPrayer]);
+  }, [currentPrayer, currentPrayerTime, nextPrayerTime, display.showCurrentPrayer]);
+
+  // Red urgency only kicks in past 60% of the prayer window
+  const isUrgent = progress >= 0.6;
+  // Border width scales from 1px to 2px only during urgent phase
+  const borderWidth = isUrgent ? 1 + ((progress - 0.6) / 0.4) : 1;
 
   const sunnahSource = isTraveling ? SUNNAH_PRAYERS_TRAVEL : SUNNAH_PRAYERS;
   const sunnahInfo = currentPrayer ? sunnahSource[currentPrayer] : null;
@@ -99,7 +113,12 @@ export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hour
     <div className="space-y-3">
       {/* Current Prayer Card */}
       {display.showCurrentPrayer && currentPrayer && currentPrayer !== 'sunrise' && (
-        <div className="bg-[var(--color-card)] rounded-lg p-3 border border-red-500/50 current-prayer-glow relative z-[45]">
+        <div
+          className={`bg-[var(--color-card)] rounded-lg p-3 border relative z-[45] ${
+            isUrgent ? 'border-red-500/50 current-prayer-glow' : 'border-[var(--color-border)]'
+          }`}
+          style={isUrgent ? { borderWidth: `${borderWidth}px` } : undefined}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-[var(--color-muted)] uppercase tracking-wide mb-0.5">
@@ -109,19 +128,20 @@ export function CountdownTimer({ currentPrayer, nextPrayer, nextPrayerTime, hour
                 {currentLabel}
               </p>
             </div>
-            {nextPrayerTime ? (
+            {currentPrayerTime ? (
               <div className="flex items-baseline gap-0.5">
                 <span className="text-2xl font-bold text-[var(--color-text)] tabular-nums">
-                  {formatNumber(currentCountdown.h)}
+                  {formatNumber(elapsed.h)}
                 </span>
                 <span className="text-lg text-[var(--color-muted)]">:</span>
                 <span className="text-2xl font-bold text-[var(--color-text)] tabular-nums">
-                  {formatNumber(currentCountdown.m)}
+                  {formatNumber(elapsed.m)}
                 </span>
                 <span className="text-lg text-[var(--color-muted)]">:</span>
                 <span className="text-2xl font-bold text-[var(--color-muted)] tabular-nums">
-                  {formatNumber(currentCountdown.s)}
+                  {formatNumber(elapsed.s)}
                 </span>
+                <span className="text-xs text-[var(--color-muted)] ml-1 self-center">ago</span>
               </div>
             ) : (
               <span className="text-sm font-medium text-[var(--color-primary)]">Active</span>
